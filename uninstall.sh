@@ -1,105 +1,138 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# Wallpaper Smart - Uninstaller (portable)
+# Works with:
+# - systemd user (service/timer) if present
+# - cron fallback (if installed)
+
 REMOVE_CONFIG=0
 REMOVE_WALLPAPERS=0
-REMOVE_IMAGES_DEFAULT="$HOME/Images/wallpaper"
+WALLPAPERS_DIR=""
 
 usage() {
   cat <<EOF
-Usage: $0 [--purge-config] [--purge-wallpapers] [--wallpapers-dir <path>] [--debug]
+Usage: $0 [options]
 
 Options:
-  --purge-config        Remove ~/.config/wallpaper-smart (config.json)
-  --purge-wallpapers    Remove wallpapers dir (templates/...)
-  --wallpapers-dir DIR  Wallpapers dir path (default: $REMOVE_IMAGES_DEFAULT)
-  --debug               Debug mode (set -x)
+  --remove-config          Remove config directory (~/.config/wallpaper-smart)
+  --remove-wallpapers      Remove wallpapers templates directory (templates/...) inside --wallpapers-dir
+  --wallpapers-dir DIR     Wallpapers root directory (same as wallpaper_dir in config.json)
+  -h, --help               Show help
+
+Examples:
+  $0
+  $0 --remove-config
+  $0 --remove-wallpapers --wallpapers-dir "$HOME/Images/wallpaper"
 EOF
 }
 
-DEBUG=0
-WALLPAPERS_DIR="$REMOVE_IMAGES_DEFAULT"
-
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --purge-config) REMOVE_CONFIG=1; shift ;;
-    --purge-wallpapers) REMOVE_WALLPAPERS=1; shift ;;
+    --remove-config) REMOVE_CONFIG=1; shift ;;
+    --remove-wallpapers) REMOVE_WALLPAPERS=1; shift ;;
     --wallpapers-dir) WALLPAPERS_DIR="${2:-}"; shift 2 ;;
-    --debug) DEBUG=1; shift ;;
     -h|--help) usage; exit 0 ;;
-    *)
-      echo "Unknown arg: $1" >&2
-      usage
-      exit 2
-      ;;
+    *) echo "Unknown argument: $1"; usage; exit 2 ;;
   esac
 done
 
-if [[ "$DEBUG" == "1" ]]; then
-  set -x
-fi
-
-log()  { printf "\033[1;32m[INFO]\033[0m %s\n" "$*"; }
-warn() { printf "\033[1;33m[WARN]\033[0m %s\n" "$*"; }
-err()  { printf "\033[1;31m[ERR ]\033[0m %s\n" "$*"; }
+log()  { printf "[1;32m[INFO][0m %s
+" "$*"; }
+warn() { printf "[1;33m[WARN][0m %s
+" "$*"; }
+err()  { printf "[1;31m[ERR ][0m %s
+" "$*"; }
 trap 'err "Error line $LINENO: $BASH_COMMAND"' ERR
 
-# Expand ~
-WALLPAPERS_DIR="${WALLPAPERS_DIR/#\~/$HOME}"
+CONFIG_DIR="$HOME/.config/wallpaper-smart"
+CONFIG_FILE="$CONFIG_DIR/config.json"
+
+BIN_DIR="$HOME/.local/bin"
+APP_DIR="$HOME/.local/share/applications"
+ICON_DIR="$HOME/.local/share/icons/hicolor"
+SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+CRON_MARKER_FILE="$CONFIG_DIR/.cron-installed"
 
 SERVICE="wallpaper-smart.service"
 TIMER="wallpaper-smart.timer"
-ICON_NAME="wallpaper-smart"
+DESKTOP_FILE="$APP_DIR/wallpaper-smart.desktop"
+APP_ICON="$APP_DIR/wallpaper-smart.png"
 
-log "Stopping / disabling timer..."
-systemctl --user disable --now "$TIMER" >/dev/null 2>&1 || true
+# Expand ~ if needed
+WALLPAPERS_DIR="${WALLPAPERS_DIR/#\~/$HOME}"
 
-log "Removing systemd user units..."
-rm -f "$HOME/.config/systemd/user/$SERVICE" || true
-rm -f "$HOME/.config/systemd/user/$TIMER" || true
+log "Stopping services (best effort)..."
 
-log "Removing systemd overrides..."
-rm -rf "$HOME/.config/systemd/user/${SERVICE}.d" || true
-rm -rf "$HOME/.config/systemd/user/${TIMER}.d" || true
-
-log "Reloading systemd user..."
-systemctl --user daemon-reload >/dev/null 2>&1 || true
-
-log "Removing scripts from ~/.local/bin/..."
-rm -f "$HOME/.local/bin/wallpaper-smart.sh" || true
-rm -f "$HOME/.local/bin/wallpaper-smart-ui" || true
-rm -f "$HOME/.local/bin/wallpaper-smart-mkplaceholders.sh" || true
-
-log "Removing .desktop..."
-rm -f "$HOME/.local/share/applications/wallpaper-smart.desktop" || true
-update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
-
-log "Removing app icon..."
-rm -f "$HOME/.local/share/icons/hicolor/scalable/apps/${ICON_NAME}.svg" || true
-rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/${ICON_NAME}.png" || true
-if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-  gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" >/dev/null 2>&1 || true
-fi
-
-if [[ "$REMOVE_CONFIG" == "1" ]]; then
-  log "Purging config: ~/.config/wallpaper-smart"
-  rm -rf "$HOME/.config/wallpaper-smart" || true
-else
-  warn "Config kept (use --purge-config to remove)."
-fi
-
-if [[ "$REMOVE_WALLPAPERS" == "1" ]]; then
-  if [[ -d "$WALLPAPERS_DIR" ]]; then
-    log "Purging wallpapers: $WALLPAPERS_DIR"
-    rm -rf "$WALLPAPERS_DIR"
-  else
-    warn "Wallpapers dir not found: $WALLPAPERS_DIR"
+# systemd user (if available)
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl --user list-unit-files 2>/dev/null | grep -q "^${TIMER}"; then
+    systemctl --user disable --now "$TIMER" >/dev/null 2>&1 || true
   fi
-else
-  warn "Wallpapers kept (use --purge-wallpapers to remove)."
+  if systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}"; then
+    systemctl --user disable --now "$SERVICE" >/dev/null 2>&1 || true
+  fi
+  systemctl --user daemon-reload >/dev/null 2>&1 || true
 fi
 
-log "Uninstall finished."
-echo ""
-echo "Tip: check timers:"
-echo "  systemctl --user list-timers | grep wallpaper-smart || true"
+# cron fallback removal (installed by portable installer)
+if command -v crontab >/dev/null 2>&1; then
+  # Remove any lines containing wallpaper-smart.sh (safe)
+  (crontab -l 2>/dev/null | grep -v "wallpaper-smart.sh" || true) | crontab - 2>/dev/null || true
+fi
+
+log "Removing installed files..."
+
+# scripts
+rm -f "$BIN_DIR/wallpaper-smart.sh" || true
+rm -f "$BIN_DIR/wallpaper-smart-ui" || true
+rm -f "$BIN_DIR/wallpaper-smart-mkplaceholders.sh" || true
+
+# systemd units
+rm -f "$SYSTEMD_USER_DIR/$SERVICE" || true
+rm -f "$SYSTEMD_USER_DIR/$TIMER" || true
+rm -rf "$SYSTEMD_USER_DIR/${SERVICE}.d" || true
+rm -rf "$SYSTEMD_USER_DIR/${TIMER}.d" || true
+
+# desktop entry + icon
+rm -f "$DESKTOP_FILE" || true
+rm -f "$APP_ICON" || true
+
+# hicolor icon (if installer placed it)
+rm -f "$ICON_DIR/256x256/apps/wallpaper-smart.png" || true
+rm -f "$ICON_DIR/128x128/apps/wallpaper-smart.png" || true
+rm -f "$ICON_DIR/64x64/apps/wallpaper-smart.png" || true
+rm -f "$ICON_DIR/48x48/apps/wallpaper-smart.png" || true
+
+# refresh desktop db (best effort)
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database "$APP_DIR" >/dev/null 2>&1 || true
+fi
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+  gtk-update-icon-cache "$HOME/.local/share/icons" >/dev/null 2>&1 || true
+fi
+
+# Optional: remove wallpapers templates
+if [[ "$REMOVE_WALLPAPERS" == "1" ]]; then
+  if [[ -z "$WALLPAPERS_DIR" ]]; then
+    warn "--remove-wallpapers used but --wallpapers-dir is missing. Skipping."
+  else
+    TEMPLATES_DIR="$WALLPAPERS_DIR/templates"
+    if [[ -d "$TEMPLATES_DIR" ]]; then
+      log "Removing templates dir: $TEMPLATES_DIR"
+      rm -rf "$TEMPLATES_DIR" || true
+    else
+      warn "Templates dir not found: $TEMPLATES_DIR"
+    fi
+  fi
+fi
+
+# Optional: remove config
+if [[ "$REMOVE_CONFIG" == "1" ]]; then
+  if [[ -d "$CONFIG_DIR" ]]; then
+    log "Removing config dir: $CONFIG_DIR"
+    rm -rf "$CONFIG_DIR" || true
+  fi
+fi
+
+log "Done. Wallpaper Smart uninstalled."

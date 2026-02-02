@@ -136,6 +136,14 @@ chmod +x install.sh
 ./install.sh
 ```
 
+#### Options utiles
+
+```bash
+--no-deps : ne tente pas d’installer les dépendances (juste check + hints)
+--force-templates : écrase les templates existants (sinon il copie seulement les manquants)
+--debug : mode verbose
+```bash
+
 ✅ Une entrée apparaîtra dans tes applications : **Wallpaper Smart**
 
 ---
