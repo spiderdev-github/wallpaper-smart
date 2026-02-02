@@ -59,6 +59,8 @@ Installées automatiquement via `install.sh` :
 - `python3-gi`
 - `python3-gi-cairo`
 - `gir1.2-gtk-3.0`
+- `qdbus-qt5`
+
 
 ---
 
@@ -266,11 +268,18 @@ chmod +x uninstall.sh
 
 ## 🗺️ Roadmap
 
-- [ ] Section "A propos" dans l'UI
-- [ ] Ajout d'un bouton "Don"
-- [ ] Ameliorer les logs (UI plus lisible)
-- [ ] Gestion avancee des themes (preview + import/export)
-- [x] Support KDE Plasma
+- [ ] Ajouter une section « À propos » dans l’interface
+- [ ] Ajouter un bouton « Don »
+- [ ] Améliorer les logs (interface plus lisible)
+- [ ] Gestion avancée des thèmes (aperçu + import/export)
+- [x] Support de KDE Plasma
+- [x] Météo en temps réel pour les localisations prédéfinies
+- [ ] Ajouter la gestion multilingue
+- [ ] Détecter la géolocalisation à l’installation pour définir la latitude/longitude par défaut
+- [ ] Section géolocalisation : en mode « Ville », récupérer la latitude/longitude à partir de la ville
+- [ ] Section géolocalisation : en mode « Fixe », récupérer la ville à partir de la latitude/longitude
+- [ ] Permettre la gestion des thèmes sombre et clair pour les fonds d’écran
+
 
 ---
 

@@ -8,15 +8,18 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any, Dict
 
 import gi
+import threading
 
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk, GdkPixbuf, Gio
+from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib
 
 import logging
 import urllib.request
 import urllib.error
 import socket
+
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -156,31 +159,41 @@ DEFAULT_CFG = {
 GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
     "none": ("Aucun (mode normal)", None),
 
-    "ae_dubai": ("🇦🇪 Dubai ☀️", (25.2048, 55.2708)),
-    "au_sydney": ("🇦🇺 Sydney 🌬️", (-33.8688, 151.2093)),
-    "br_rio": ("🇧🇷 Rio de Janeiro 🌴", (-22.9068, -43.1729)),
-    "ca_vancouver": ("🇨🇦 Vancouver 🌧️", (49.2827, -123.1207)),
-    "cn_beijing": ("🇨🇳 Pekin 🌫️", (39.9042, 116.4074)),
-    "eg_cairo": ("🇪🇬 Le Caire ☀️", (30.0444, 31.2357)),
-    "fr_paris": ("🇫🇷 Paris 🌦️", (48.8566, 2.3522)),
-    "fr_strasbourg": ("🇫🇷 Strasbourg 🌧️", (48.5734, 7.7521)),
-    "gb_london": ("🇬🇧 Londres 🌧️", (51.5074, -0.1278)),
-    "id_jakarta": ("🇮🇩 Jakarta 🌴", (-6.2088, 106.8456)),
-    "in_delhi": ("🇮🇳 Delhi ☀️", (28.6139, 77.2090)),
-    "is_reykjavik": ("🇮🇸 Reykjavik ❄️", (64.1466, -21.9426)),
-    "jp_tokyo": ("🇯🇵 Tokyo 🌦️", (35.6762, 139.6503)),
-    "ma_casablanca": ("🇲🇦 Casablanca 🌬️", (33.5731, -7.5898)),
-    "no_oslo": ("🇳🇴 Oslo ❄️", (59.9139, 10.7522)),
-    "nl_amsterdam": ("🇳🇱 Amsterdam 🌧️", (52.3676, 4.9041)),
-    "ru_kazan": ("🇷🇺 Kazan ❄️", (55.7961, 49.1064)),
-    "ru_moscow": ("🇷🇺 Moscou ❄️", (55.7558, 37.6173)),
-    "sg_singapore": ("🇸🇬 Singapore 🌴", (1.3521, 103.8198)),
-    "th_bangkok": ("🇹🇭 Bangkok 🌴", (13.7563, 100.5018)),
-    "tr_istanbul": ("🇹🇷 Istanbul 🌬️", (41.0082, 28.9784)),
-    "us_los_angeles": ("🇺🇸 Los Angeles ☀️", (34.0522, -118.2437)),
-    "us_new_york": ("🇺🇸 New York 🌦️", (40.7128, -74.0060)),
+    "ae_dubai": ("🇦🇪 Dubai", (25.2048, 55.2708)),
+    "au_sydney": ("🇦🇺 Sydney", (-33.8688, 151.2093)),
+    "br_rio": ("🇧🇷 Rio de Janeiro", (-22.9068, -43.1729)),
+    "ca_vancouver": ("🇨🇦 Vancouver", (49.2827, -123.1207)),
+    "cn_beijing": ("🇨🇳 Pekin", (39.9042, 116.4074)),
+    "eg_cairo": ("🇪🇬 Le Caire", (30.0444, 31.2357)),
+    "fr_paris": ("🇫🇷 Paris", (48.8566, 2.3522)),
+    "fr_strasbourg": ("🇫🇷 Strasbourg", (48.5734, 7.7521)),
+    "gb_london": ("🇬🇧 Londres", (51.5074, -0.1278)),
+    "id_jakarta": ("🇮🇩 Jakarta", (-6.2088, 106.8456)),
+    "in_delhi": ("🇮🇳 Delhi", (28.6139, 77.2090)),
+    "is_reykjavik": ("🇮🇸 Reykjavik", (64.1466, -21.9426)),
+    "jp_tokyo": ("🇯🇵 Tokyo", (35.6762, 139.6503)),
+    "ma_casablanca": ("🇲🇦 Casablanca", (33.5731, -7.5898)),
+    "no_oslo": ("🇳🇴 Oslo", (59.9139, 10.7522)),
+    "nl_amsterdam": ("🇳🇱 Amsterdam", (52.3676, 4.9041)),
+    "ru_kazan": ("🇷🇺 Kazan", (55.7961, 49.1064)),
+    "ru_moscow": ("🇷🇺 Moscou", (55.7558, 37.6173)),
+    "sg_singapore": ("🇸🇬 Singapore", (1.3521, 103.8198)),
+    "th_bangkok": ("🇹🇭 Bangkok", (13.7563, 100.5018)),
+    "tr_istanbul": ("🇹🇷 Istanbul", (41.0082, 28.9784)),
+    "us_los_angeles": ("🇺🇸 Los Angeles", (34.0522, -118.2437)),
+    "us_new_york": ("🇺🇸 New York", (40.7128, -74.0060)),
 }
 
+
+
+def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}&current=weather_code"
+    )
+    d = _http_json(url, timeout=timeout)
+    cur = d.get("current") or {}
+    return int(cur.get("weather_code") or 0)
 
 
 # ---------------- Wallpaper themes ----------------
@@ -959,7 +972,10 @@ class App(Gtk.Window):
 
         self.nb.append_page(self.build_tab_general(), make_tab_label("Général", "preferences-system-symbolic"))
         self.nb.append_page(self.build_tab_time(),    make_tab_label("Time",    "alarm-symbolic"))
+        
         self.nb.append_page(self.build_tab_geoloc(),  make_tab_label("Géoloc",   "mark-location-symbolic"))
+        self.refresh_preset_icons_async()
+
         self.nb.append_page(self.build_tab_mapping(), make_tab_label("Mapping", "view-list-symbolic"))
 
         # Images: garder une référence pour rebuild safe
@@ -991,6 +1007,82 @@ class App(Gtk.Window):
         bar.pack_start(btn_logs, False, False, 0)
         bar.pack_end(self.btn_toggle, False, False, 0)
 
+
+
+        # Then every 10 minutes (avoid hammering API)
+        GLib.timeout_add_seconds(600, self._timer_refresh_preset_icons)
+
+    def _update_preset_icon_row(self, treeiter, emoji: str):
+        # Must run in GTK main thread
+        try:
+            self.preset_store[treeiter][2] = emoji
+        except Exception:
+            pass
+        return False
+
+    def _code_to_emoji(self, code: int) -> str:
+        try:
+            c = int(code)
+        except Exception:
+            c = 0
+
+        if c == 0:
+            return "☀️"
+        if c in [1, 2, 3]:
+            return "☁️"
+        if c in [45, 48]:
+            return "🌫️"
+        if c in [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82]:
+            return "🌧️"
+        if c in [71, 73, 75, 77, 85, 86]:
+            return "❄️"
+        if c in [95, 96, 99]:
+            return "⛈️"
+        return "☀️"
+
+
+    def _timer_refresh_preset_icons(self):
+        self.refresh_preset_icons_async()
+        return True
+
+    def refresh_preset_icons_async(self):
+        # Run once, avoid heavy polling
+        if not hasattr(self, "preset_store"):
+            return
+
+        def worker():
+            for row in self.preset_store:
+                pid = row[0]
+                if pid == "none":
+                    continue
+                lat = float(row[3])
+                lon = float(row[4])
+
+                code = 0
+                try:
+                    url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=weather_code"
+                    obj = _http_json(url, timeout=4)
+                    cur = obj.get("current") or {}
+                    code = int(cur.get("weather_code") or 0)
+                except Exception:
+                    code = 0
+
+                emoji = self._code_to_emoji(code)
+
+                def apply_update(pid_local: str, emoji_local: str):
+                    it = self.preset_store.get_iter_first()
+                    while it:
+                        if self.preset_store[it][0] == pid_local:
+                            self.preset_store[it][2] = emoji_local
+                            break
+                        it = self.preset_store.iter_next(it)
+                    return False
+
+                GLib.idle_add(apply_update, pid, emoji)
+
+        th = threading.Thread(target=worker, daemon=True)
+        th.start()
+        
     def _refresh_theme_combo_items(self):
         if not hasattr(self, "wall_theme_combo"):
             return
@@ -1388,7 +1480,11 @@ class App(Gtk.Window):
         self.geo_combo = Gtk.ComboBoxText()
         for t in ["auto_ip", "fixed", "city"]:
             self.geo_combo.append_text(t)
-        self.geo_combo.set_active(["auto_ip", "fixed", "city"].index(self.cfg["geolocation"]["mode"]))
+
+        cur_mode = self.cfg.get("geolocation", {}).get("mode", "auto_ip")
+        if cur_mode not in ["auto_ip", "fixed", "city"]:
+            cur_mode = "auto_ip"
+        self.geo_combo.set_active(["auto_ip", "fixed", "city"].index(cur_mode))
 
         mode_lbl = Gtk.Label(label="Mode", xalign=0)
         mode_lbl.get_style_context().add_class("muted")
@@ -1397,27 +1493,59 @@ class App(Gtk.Window):
 
         self.geo_combo.connect("changed", self.on_geo_mode_changed)
 
-        # Preset (simulation météo)
         preset_lbl = Gtk.Label(label="Preset (simulation)", xalign=0)
         preset_lbl.get_style_context().add_class("muted")
 
-        self.preset_combo = Gtk.ComboBoxText()
-        for key, (label, _coords) in GEO_PRESETS.items():
-            self.preset_combo.append(key, label)
+        # Model: id, label, icon, lat, lon
+        self.preset_store = Gtk.ListStore(str, str, str, float, float)
 
+        # Optional: add a "none" row
+        self.preset_store.append(["none", "Aucun (mode normal)", "", 0.0, 0.0])
+
+        for pid, (label, coords) in GEO_PRESETS.items():
+            if pid == "none" or not coords:
+                continue
+            lat, lon = coords
+            self.preset_store.append([pid, label, "…", float(lat), float(lon)])
+
+        self.preset_combo = Gtk.ComboBox.new_with_model(self.preset_store)
+
+        r_label = Gtk.CellRendererText()
+        self.preset_combo.pack_start(r_label, True)
+        self.preset_combo.add_attribute(r_label, "text", 1)
+
+        r_icon = Gtk.CellRendererText()
+        r_icon.set_property("xalign", 1.0)
+        self.preset_combo.pack_start(r_icon, False)
+        self.preset_combo.add_attribute(r_icon, "text", 2)
+
+        # Select current preset from cfg
         cur_preset = self.cfg.get("geolocation", {}).get("preset", "none")
-        if cur_preset not in GEO_PRESETS:
-            cur_preset = "none"
-        self.preset_combo.set_active_id(cur_preset)
+        it = self.preset_store.get_iter_first()
+        active_iter = None
+        while it:
+            if self.preset_store[it][0] == cur_preset:
+                active_iter = it
+                break
+            it = self.preset_store.iter_next(it)
+
+        if active_iter is not None:
+            self.preset_combo.set_active_iter(active_iter)
+        else:
+            self.preset_combo.set_active_iter(self.preset_store.get_iter_first())
+
         self.preset_combo.connect("changed", self.on_geo_preset_changed)
 
         content.pack_start(preset_lbl, False, False, 0)
         content.pack_start(self.preset_combo, False, False, 0)
 
-        fixed = self.cfg["geolocation"]["fixed"]
-        self.lat_entry = Gtk.Entry(); self.lat_entry.set_text(str(fixed["lat"]))
-        self.lon_entry = Gtk.Entry(); self.lon_entry.set_text(str(fixed["lon"]))
-        self.city_entry = Gtk.Entry(); self.city_entry.set_text(self.cfg["geolocation"]["city_name"])
+        fixed = self.cfg.get("geolocation", {}).get("fixed", {"lat": 48.5839, "lon": 7.7455})
+        self.lat_entry = Gtk.Entry()
+        self.lat_entry.set_text(str(fixed.get("lat", 48.5839)))
+        self.lon_entry = Gtk.Entry()
+        self.lon_entry.set_text(str(fixed.get("lon", 7.7455)))
+        self.city_entry = Gtk.Entry()
+        self.city_entry.set_text(self.cfg.get("geolocation", {}).get("city_name", "Strasbourg"))
 
         g = Gtk.Grid(column_spacing=10, row_spacing=8)
         g.attach(Gtk.Label(label="Lat", xalign=0), 0, 0, 1, 1)
@@ -1430,18 +1558,18 @@ class App(Gtk.Window):
         content.pack_start(g, False, False, 0)
 
         hint = Gtk.Label(
-            label="Astuce: 'city' utilise OpenStreetMap (Nominatim). À utiliser pour config, pas en polling intensif.",
+            label="Astuce: 'city' utilise OpenStreetMap (Nominatim). A utiliser pour config, pas en polling intensif.",
             xalign=0
         )
         hint.set_line_wrap(True)
         hint.get_style_context().add_class("muted")
         content.pack_start(hint, False, False, 0)
 
-        # appliquer sensitivité initiale
         self.refresh_geoloc_controls()
 
-        box.pack_start(make_card("Géolocalisation", content), False, False, 0)
+        box.pack_start(make_card("Geolocalisation", content), False, False, 0)
         return make_page(box)
+
 
     def build_tab_mapping(self):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -1967,33 +2095,44 @@ class App(Gtk.Window):
         self.refresh_geoloc_controls()
 
     def on_geo_preset_changed(self, _combo):
-        """Apply preset instantly in the UI (save only on Enregistrer)."""
-        preset_id = self.preset_combo.get_active_id() if hasattr(self, "preset_combo") else "none"
+        preset_id = "none"
+
+        it = None
+        try:
+            it = self.preset_combo.get_active_iter()
+        except Exception:
+            it = None
+
+        if it is None:
+            preset_id = "none"
+        else:
+            preset_id = self.preset_store[it][0]
+
         if not preset_id:
             preset_id = "none"
 
         if preset_id != "none":
-            label, coords = GEO_PRESETS.get(preset_id, ("", None))
-            if coords:
-                lat, lon = coords
+            lat = float(self.preset_store[it][3])
+            lon = float(self.preset_store[it][4])
+            label = str(self.preset_store[it][1])
 
-                # Fill entries (UI only)
-                self.lat_entry.set_text(f"{lat:.4f}")
-                self.lon_entry.set_text(f"{lon:.4f}")
+            self.lat_entry.set_text(f"{lat:.4f}")
+            self.lon_entry.set_text(f"{lon:.4f}")
 
-                # Update City field to match preset label (UI only)
-                if hasattr(self, "city_entry"):
-                    # Keep it "clean" (optional): remove flag emojis if present
-                    pretty = label
-                    for flag in ["🇷🇺", "🇺🇸", "🇮🇸", "🇸🇬", "🇦🇪", "🇯🇵", "🇦🇺", "🇲🇦"]:
-                        pretty = pretty.replace(flag, "")
-                    pretty = pretty.strip()
-                    self.city_entry.set_text(pretty)
+            # Clean city field (remove flag + meteo icon at end if any)
+            pretty = label
+            for flag in ["🇷🇺","🇺🇸","🇮🇸","🇸🇬","🇦🇪","🇯🇵","🇦🇺","🇲🇦","🇫🇷","🇩🇪","🇪🇸","🇮🇹","🇬🇧","🇨🇦","🇧🇷","🇲🇽","🇿🇦","🇮🇳","🇨🇳"]:
+                pretty = pretty.replace(flag, "")
+            pretty = pretty.strip()
 
-                # Force mode fixed in UI
-                self.geo_combo.set_active(["auto_ip", "fixed", "city"].index("fixed"))
+            # If label contains " - " or " | " you can trim, but keep it simple:
+            self.city_entry.set_text(pretty)
+
+            # Force fixed mode
+            self.geo_combo.set_active(["auto_ip", "fixed", "city"].index("fixed"))
 
         self.refresh_geoloc_controls()
+
 
     def on_choose_folder(self, _btn):
         dlg = Gtk.FileChooserDialog(
