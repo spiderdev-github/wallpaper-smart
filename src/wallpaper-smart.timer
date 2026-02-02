@@ -1,0 +1,11 @@
+# wallpaper-smart.timer
+[Unit]
+Description=Run smart wallpaper updater every 10 minutes
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

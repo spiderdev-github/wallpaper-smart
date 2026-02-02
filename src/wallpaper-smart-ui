@@ -1,0 +1,2294 @@
+#!/usr/bin/env python3
+import json
+import os
+import subprocess
+import urllib.request
+
+from pathlib import Path
+from typing import Dict, List, Tuple, Any, Dict
+
+import gi
+
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk, GdkPixbuf, Gio
+
+import logging
+import urllib.request
+import urllib.error
+import socket
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
+APP_DIR = Path.home() / ".config" / "wallpaper-smart"
+CFG_PATH = APP_DIR / "config.json"
+
+SERVICE = "wallpaper-smart.service"
+TIMER = "wallpaper-smart.timer"
+
+MOMENTS: List[Tuple[str, str]] = [
+    ("aube", "Aube"),
+    ("midi", "Midi"),
+    ("coucher", "Coucher"),
+    ("nuit", "Nuit"),
+]
+
+WEATHER_KEYS_ORDER = ["clear", "cloudy", "fog", "rain", "snow", "thunder"]
+
+DEFAULT_CFG = {
+    "wallpaper_dir": str(Path.home() / "Images" / "wallpaper"),
+    "wallpaper_theme": "default",
+    "schedule": {"nuit_start": 19, "aube_start": 5, "midi_start": 11, "coucher_start": 17},
+    "geolocation": {
+        "mode": "auto_ip",  # auto_ip | fixed | city
+        "fixed": {"lat": 48.5839, "lon": 7.7455},
+        "city_name": "Strasbourg",
+        "preset": "none",
+    },
+    "weather_mapping": {
+        "clear": "clair",
+        "cloudy": "nuageux",
+        "fog": "brouillard",
+        "rain": "pluie",
+        "snow": "neige",
+        "thunder": "orage",
+    },
+    "timer_minutes": 10,
+    "enabled_images": {},  # NEW: per-image toggle (rel path -> bool)
+}
+
+
+# Presets de géolocalisation (simulation météo)
+# Choisir un preset remplit Lat/Lon et force le mode "fixed" (sans sauvegarder tant que tu n'as pas cliqué Enregistrer).
+# GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
+#     "none": ("Aucun (mode normal)", None),
+
+#     # Europe
+#     "paris": ("Paris 🇫🇷", (48.8566, 2.3522)),
+#     "london": ("Londres 🇬🇧", (51.5074, -0.1278)),
+#     "berlin": ("Berlin 🇩🇪", (52.5200, 13.4050)),
+#     "madrid": ("Madrid 🇪🇸", (40.4168, -3.7038)),
+#     "rome": ("Rome 🇮🇹", (41.9028, 12.4964)),
+#     "amsterdam": ("Amsterdam 🇳🇱", (52.3676, 4.9041)),
+#     "brussels": ("Bruxelles 🇧🇪", (50.8503, 4.3517)),
+#     "vienna": ("Vienne 🇦🇹", (48.2082, 16.3738)),
+#     "prague": ("Prague 🇨🇿", (50.0755, 14.4378)),
+#     "warsaw": ("Varsovie 🇵🇱", (52.2297, 21.0122)),
+#     "stockholm": ("Stockholm 🇸🇪", (59.3293, 18.0686)),
+#     "oslo": ("Oslo 🇳🇴", (59.9139, 10.7522)),
+#     "helsinki": ("Helsinki 🇫🇮", (60.1699, 24.9384)),
+#     "copenhagen": ("Copenhague 🇩🇰", (55.6761, 12.5683)),
+#     "lisbon": ("Lisbonne 🇵🇹", (38.7223, -9.1393)),
+#     "athens": ("Athenes 🇬🇷", (37.9838, 23.7275)),
+#     "zurich": ("Zurich 🇨🇭", (47.3769, 8.5417)),
+#     "geneva": ("Geneve 🇨🇭", (46.2044, 6.1432)),
+#     "istanbul": ("Istanbul 🇹🇷", (41.0082, 28.9784)),
+#     "moscow": ("Moscou 🇷🇺", (55.7558, 37.6173)),
+#     "kazan": ("Kazan 🇷🇺", (55.7961, 49.1064)),
+#     "reykjavik": ("Reykjavik 🇮🇸", (64.1466, -21.9426)),
+
+#     # Amerique du Nord
+#     "new_york": ("New York 🇺🇸", (40.7128, -74.0060)),
+#     "los_angeles": ("Los Angeles 🇺🇸", (34.0522, -118.2437)),
+#     "san_francisco": ("San Francisco 🇺🇸", (37.7749, -122.4194)),
+#     "chicago": ("Chicago 🇺🇸", (41.8781, -87.6298)),
+#     "miami": ("Miami 🇺🇸", (25.7617, -80.1918)),
+#     "toronto": ("Toronto 🇨🇦", (43.6532, -79.3832)),
+#     "montreal": ("Montreal 🇨🇦", (45.5017, -73.5673)),
+#     "vancouver": ("Vancouver 🇨🇦", (49.2827, -123.1207)),
+#     "mexico_city": ("Mexico 🇲🇽", (19.4326, -99.1332)),
+
+#     # Amerique du Sud
+#     "sao_paulo": ("Sao Paulo 🇧🇷", (-23.5505, -46.6333)),
+#     "rio": ("Rio de Janeiro 🇧🇷", (-22.9068, -43.1729)),
+#     "buenos_aires": ("Buenos Aires 🇦🇷", (-34.6037, -58.3816)),
+#     "santiago": ("Santiago 🇨🇱", (-33.4489, -70.6693)),
+#     "lima": ("Lima 🇵🇪", (-12.0464, -77.0428)),
+#     "bogota": ("Bogota 🇨🇴", (4.7110, -74.0721)),
+
+#     # Afrique
+#     "casablanca": ("Casablanca 🇲🇦", (33.5731, -7.5898)),
+#     "rabat": ("Rabat 🇲🇦", (34.0209, -6.8416)),
+#     "algiers": ("Alger 🇩🇿", (36.7538, 3.0588)),
+#     "tunis": ("Tunis 🇹🇳", (36.8065, 10.1815)),
+#     "cairo": ("Le Caire 🇪🇬", (30.0444, 31.2357)),
+#     "lagos": ("Lagos 🇳🇬", (6.5244, 3.3792)),
+#     "nairobi": ("Nairobi 🇰🇪", (-1.2921, 36.8219)),
+#     "addis_ababa": ("Addis-Abeba 🇪🇹", (8.9806, 38.7578)),
+#     "johannesburg": ("Johannesburg 🇿🇦", (-26.2041, 28.0473)),
+#     "cape_town": ("Le Cap 🇿🇦", (-33.9249, 18.4241)),
+#     "dakar": ("Dakar 🇸🇳", (14.7167, -17.4677)),
+
+#     # Moyen-Orient
+#     "dubai": ("Dubai 🇦🇪", (25.2048, 55.2708)),
+#     "abu_dhabi": ("Abu Dhabi 🇦🇪", (24.4539, 54.3773)),
+#     "doha": ("Doha 🇶🇦", (25.2854, 51.5310)),
+#     "riyadh": ("Riyad 🇸🇦", (24.7136, 46.6753)),
+#     "jerusalem": ("Jerusalem 🇮🇱", (31.7683, 35.2137)),
+#     "tehran": ("Teheran 🇮🇷", (35.6892, 51.3890)),
+
+#     # Asie
+#     "tokyo": ("Tokyo 🇯🇵", (35.6762, 139.6503)),
+#     "osaka": ("Osaka 🇯🇵", (34.6937, 135.5023)),
+#     "seoul": ("Seoul 🇰🇷", (37.5665, 126.9780)),
+#     "beijing": ("Pekin 🇨🇳", (39.9042, 116.4074)),
+#     "shanghai": ("Shanghai 🇨🇳", (31.2304, 121.4737)),
+#     "hong_kong": ("Hong Kong 🇭🇰", (22.3193, 114.1694)),
+#     "taipei": ("Taipei 🇹🇼", (25.0330, 121.5654)),
+#     "singapore": ("Singapore 🇸🇬", (1.3521, 103.8198)),
+#     "bangkok": ("Bangkok 🇹🇭", (13.7563, 100.5018)),
+#     "kuala_lumpur": ("Kuala Lumpur 🇲🇾", (3.1390, 101.6869)),
+#     "jakarta": ("Jakarta 🇮🇩", (-6.2088, 106.8456)),
+#     "manila": ("Manille 🇵🇭", (14.5995, 120.9842)),
+#     "delhi": ("Delhi 🇮🇳", (28.6139, 77.2090)),
+#     "mumbai": ("Mumbai 🇮🇳", (19.0760, 72.8777)),
+#     "bengaluru": ("Bengaluru 🇮🇳", (12.9716, 77.5946)),
+
+#     # Oceanie
+#     "sydney": ("Sydney 🇦🇺", (-33.8688, 151.2093)),
+#     "melbourne": ("Melbourne 🇦🇺", (-37.8136, 144.9631)),
+#     "auckland": ("Auckland 🇳🇿", (-36.8485, 174.7633)),
+# }
+
+GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
+    "none": ("Aucun (mode normal)", None),
+
+    "ae_dubai": ("🇦🇪 Dubai ☀️", (25.2048, 55.2708)),
+    "au_sydney": ("🇦🇺 Sydney 🌬️", (-33.8688, 151.2093)),
+    "br_rio": ("🇧🇷 Rio de Janeiro 🌴", (-22.9068, -43.1729)),
+    "ca_vancouver": ("🇨🇦 Vancouver 🌧️", (49.2827, -123.1207)),
+    "cn_beijing": ("🇨🇳 Pekin 🌫️", (39.9042, 116.4074)),
+    "eg_cairo": ("🇪🇬 Le Caire ☀️", (30.0444, 31.2357)),
+    "fr_paris": ("🇫🇷 Paris 🌦️", (48.8566, 2.3522)),
+    "fr_strasbourg": ("🇫🇷 Strasbourg 🌧️", (48.5734, 7.7521)),
+    "gb_london": ("🇬🇧 Londres 🌧️", (51.5074, -0.1278)),
+    "id_jakarta": ("🇮🇩 Jakarta 🌴", (-6.2088, 106.8456)),
+    "in_delhi": ("🇮🇳 Delhi ☀️", (28.6139, 77.2090)),
+    "is_reykjavik": ("🇮🇸 Reykjavik ❄️", (64.1466, -21.9426)),
+    "jp_tokyo": ("🇯🇵 Tokyo 🌦️", (35.6762, 139.6503)),
+    "ma_casablanca": ("🇲🇦 Casablanca 🌬️", (33.5731, -7.5898)),
+    "no_oslo": ("🇳🇴 Oslo ❄️", (59.9139, 10.7522)),
+    "nl_amsterdam": ("🇳🇱 Amsterdam 🌧️", (52.3676, 4.9041)),
+    "ru_kazan": ("🇷🇺 Kazan ❄️", (55.7961, 49.1064)),
+    "ru_moscow": ("🇷🇺 Moscou ❄️", (55.7558, 37.6173)),
+    "sg_singapore": ("🇸🇬 Singapore 🌴", (1.3521, 103.8198)),
+    "th_bangkok": ("🇹🇭 Bangkok 🌴", (13.7563, 100.5018)),
+    "tr_istanbul": ("🇹🇷 Istanbul 🌬️", (41.0082, 28.9784)),
+    "us_los_angeles": ("🇺🇸 Los Angeles ☀️", (34.0522, -118.2437)),
+    "us_new_york": ("🇺🇸 New York 🌦️", (40.7128, -74.0060)),
+}
+
+
+
+# ---------------- Wallpaper themes ----------------
+def load_wallpaper_themes(wallpaper_dir: str) -> List[Tuple[str, str]]:
+    root = Path(wallpaper_dir).expanduser()
+    troot = root / "templates"
+    out: List[Tuple[str, str]] = []
+
+    if not troot.exists():
+        return [("default", "Defaut")]
+
+    required = ["aube.png", "midi.png", "coucher.png", "nuit.png"]
+
+    for d in sorted([p for p in troot.iterdir() if p.is_dir()]):
+        theme_id = d.name
+
+        base_dir = d / "base"
+        if not base_dir.is_dir():
+            continue
+
+        ok = True
+        for fn in required:
+            if not (base_dir / fn).is_file():
+                ok = False
+                break
+        if not ok:
+            continue
+
+        label = theme_id
+
+        meta = d / "theme.json"
+        if meta.is_file():
+            try:
+                data = json.loads(meta.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    name = str(data.get("name") or "").strip()
+                    if name:
+                        label = name
+            except Exception:
+                pass
+
+        out.append((theme_id, label))
+
+    if not out:
+        return [("default", "Defaut")]
+
+    return out
+
+
+def _http_json(url: str, timeout: int = 5) -> Dict[str, Any]:
+    """
+    Fetch JSON from URL with a hard timeout.
+    Raises exceptions on HTTP/network/JSON errors.
+    """
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "wallpaper-smart/1.0",
+            "Accept": "application/json",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace") if hasattr(e, "read") else ""
+        raise RuntimeError(f"HTTPError {e.code} on {url}: {body[:200]}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"URLError on {url}: {e.reason}") from e
+    except socket.timeout as e:
+        raise RuntimeError(f"Timeout after {timeout}s on {url}") from e
+
+    obj = json.loads(raw)
+    if not isinstance(obj, dict):
+        raise RuntimeError(f"Expected JSON object, got {type(obj).__name__}")
+    return obj
+
+# ---------------- Theme detection + CSS ----------------
+
+def detect_dark_mode() -> bool:
+    """
+    Detect if the user prefers dark mode.
+
+    GNOME 42+ uses:
+      org.gnome.desktop.interface color-scheme = 'prefer-dark' | 'default'
+    Fallback to GTK setting if unavailable.
+    """
+
+    # GNOME color-scheme (modern)
+    try:
+        s = Gio.Settings.new("org.gnome.desktop.interface")
+        scheme = s.get_string("color-scheme")  # may raise if key doesn't exist
+        if scheme == "prefer-dark":
+            return True
+        if scheme == "default":
+            return False
+    except Exception:
+        pass
+
+    # GTK fallback
+    try:
+        gtk_settings = Gtk.Settings.get_default()
+        return bool(gtk_settings.get_property("gtk-application-prefer-dark-theme"))
+    except Exception:
+        return False
+
+
+
+def _auto_ip_details() -> Dict[str, str | float]:
+    """Return best-effort IP-based geolocation details (lat, lon, city, region, country)."""
+    try:
+        print("Fetching auto IP geolocation details...", flush=True)
+
+        g = _http_json("https://ipapi.co/json/", timeout=4)
+
+        lat = g.get("latitude")
+        lon = g.get("longitude")
+        print(f"raw lat={lat} raw lon={lon}", flush=True)
+
+        city = (g.get("city") or "").strip()
+        region = (g.get("region") or "").strip()
+        country = (g.get("country_name") or g.get("country") or "").strip()
+
+        out: Dict[str, str | float] = {}
+        if lat is not None:
+            out["lat"] = float(lat)
+        if lon is not None:
+            out["lon"] = float(lon)
+        if city:
+            out["city"] = city
+        if region:
+            out["region"] = region
+        if country:
+            out["country"] = country
+
+        print(f"out={out}", flush=True)
+        return out
+
+    except Exception as e:
+        print(f"[auto_ip_details] ERROR: {e}", flush=True)
+        return {}
+
+    
+def apply_css(dark: bool):
+    if dark:
+        css = b"""
+            * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
+
+            window { background: #2B2B2B; color: #EDEDED; }
+
+            /* Header discret */
+            .header {
+            padding: 12px 14px;
+            background: #2B2B2B;
+            border: 0;
+            }
+            .header-title { font-size: 16px; font-weight: 800; color: #EDEDED; }
+            .header-sub { font-size: 12px; color: rgba(237,237,237,0.60); }
+
+            /* Notebook type GNOME (soft) */
+            notebook { background: transparent; border: 0; }
+            notebook header { background: transparent; border: 0; }
+            notebook tab {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 10px;
+            padding: 6px 12px;
+            margin: 6px 6px 10px 0;
+            }
+            notebook tab:checked {
+            background: rgba(255,255,255,0.10);
+            border-color: rgba(255,255,255,0.14);
+            }
+
+            /* Pages */
+            .page { padding: 10px; }
+
+            /* Cards (sombres, bord fin) */
+            .card {
+            background: #343434;
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 14px;
+            padding: 12px;
+            }
+            .card-title { font-size: 13px; font-weight: 800; color: #EDEDED; }
+            .muted { color: rgba(237,237,237,0.60); }
+
+            /* Inputs (text fields) */
+            entry, spinbutton entry {
+            background: rgba(255,255,255,0.06);
+            color: #EDEDED;
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 12px;
+            padding: 10px;
+            }
+            
+            /* Combobox (Mode / Preset) : style flat, pas de double bordure */
+            combobox {
+                background: transparent;
+                border: 0;
+            }
+            
+            /* La boite principale du combobox */
+            combobox box {
+                background: #4b4b4b;
+                color: #EDEDED;
+                border: 0;
+                border-radius: 999px;
+                padding: 10px 12px;
+                box-shadow: none;
+            }
+            
+            /* IMPORTANT : le combobox contient un button interne (fleche) -> on annule ton style global button */
+            combobox button {
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            padding: 0;
+            border-radius: 999px;
+            }
+
+            /* Hover / Focus leger (optionnel) */
+            combobox box:hover {
+            background: rgba(255,255,255,0.10);
+            }
+            combobox:focus-within box {
+            background: rgba(255,255,255,0.12);
+            box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.55); /* petit focus accent */
+            }
+
+            /* Buttons neutres */
+            button {
+            background: rgba(255,255,255,0.06);
+            color: #EDEDED;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            padding: 8px 14px;
+            }
+            button:hover { background: rgba(255,255,255,0.10); }
+
+            /* Accent Ubuntu (orange) */
+            .accent {
+            background: #E95420;
+            border-color: transparent;
+            color: #FFFFFF;
+            font-weight: 800;
+            }
+            .accent:hover { background: #F06434; }
+
+            /* Secondaire */
+            .warn {
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.14);
+            color: #EDEDED;
+            font-weight: 700;
+            }
+            .warn:hover { background: rgba(255,255,255,0.12); }
+
+            /* Chips */
+            .chip {
+            border-radius: 999px;
+            padding: 2px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid rgba(255,255,255,0.14);
+            }
+            .chip-ok {
+            background: rgba(46, 204, 113, 0.18);
+            color: #D9F8E6;
+            border-color: rgba(46, 204, 113, 0.28);
+            }
+            .chip-miss {
+            background: rgba(231, 76, 60, 0.18);
+            color: #FFE2DD;
+            border-color: rgba(231, 76, 60, 0.28);
+            }
+
+
+            /* Switch */
+            .ws-switch { margin-left: 4px; }
+
+            switch {
+              background: rgba(255,255,255,0.12);
+              border: 1px solid rgba(255,255,255,0.14);
+              border-radius: 999px;
+              padding: 2px;
+              min-width: 46px;
+              min-height: 24px;
+            }
+            switch:checked {
+              background: rgba(233, 84, 32, 0.85);
+              border-color: rgba(233, 84, 32, 0.95);
+            }
+            switch slider {
+              background: #EDEDED;
+              border: 1px solid rgba(0,0,0,0.20);
+              border-radius: 50px;
+              min-width: 30px;
+              min-height: 20px;
+            }
+            switch:disabled { opacity: 0.5; }
+
+
+    
+        /* Switch */
+        .ws-switch { margin-left: 4px; }
+
+        switch {
+          background: rgba(0,0,0,0.08);
+          border: 1px solid rgba(0,0,0,0.12);
+          border-radius: 999px;
+          padding: 2px;
+          min-width: 46px;
+          min-height: 24px;
+        }
+        switch:checked {
+          background: rgba(233, 84, 32, 0.92);
+          border-color: rgba(233, 84, 32, 1.0);
+        }
+        switch slider {
+          background: #FFFFFF;
+          border: 1px solid rgba(0,0,0,0.18);
+          border-radius: 50px;
+          min-width: 30px;
+          min-height: 20px;
+        }
+        switch:disabled { opacity: 0.6; }
+
+
+        /* Actionbar */
+            .actionbar {
+            padding: 10px;
+            background: #2B2B2B;
+            border: 0;
+            }
+
+            /* Tabs GNOME-like + icons */
+            .tab-icon { opacity: 0.90; }
+            .tab-text { font-weight: 700; }
+            notebook tab:checked {
+              box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.90);
+            }
+        """
+    else:
+        css = b"""
+        * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
+
+        window { background: #FFFFFF; color: #1E1E1E; }
+
+        /* Header discret */
+        .header {
+        padding: 12px 14px;
+        background: #FFFFFF;
+        border: 0;
+        }
+        .header-title { font-size: 16px; font-weight: 800; color: #1E1E1E; }
+        .header-sub { font-size: 12px; color: rgba(30,30,30,0.60); }
+
+        /* Notebook type GNOME (soft) */
+        notebook { background: transparent; border: 0; }
+        notebook header { background: transparent; border: 0; }
+        notebook tab {
+        background: rgba(0,0,0,0.04);
+        border: 1px solid rgba(0,0,0,0.06);
+        border-radius: 10px;
+        padding: 6px 12px;
+        margin: 6px 6px 10px 0;
+        }
+        notebook tab:checked {
+        background: rgba(0,0,0,0.06);
+        border-color: rgba(0,0,0,0.08);
+        }
+
+        /* Pages */
+        .page { padding: 10px; }
+
+        /* Cards (blanches, bord fin) */
+        .card {
+        background: #FFFFFF;
+        border: 1px solid rgba(0,0,0,0.10);
+        border-radius: 14px;
+        padding: 12px;
+        }
+        .card-title { font-size: 13px; font-weight: 800; color: #1E1E1E; }
+        .muted { color: rgba(30,30,30,0.60); }
+
+        /* Inputs */
+        entry, spinbutton entry, combobox box {
+        background: #FFFFFF;
+        color: #1E1E1E;
+        border: 1px solid rgba(0,0,0,0.14);
+        border-radius: 12px;
+        padding: 10px;
+        }
+
+        /* Buttons neutres */
+        button {
+        background: rgba(0,0,0,0.04);
+        color: #1E1E1E;
+        border: 1px solid rgba(0,0,0,0.10);
+        border-radius: 999px;
+        padding: 8px 14px;
+        }
+        button:hover { background: rgba(0,0,0,0.06); }
+
+        /* Accent Ubuntu (orange) */
+        .accent {
+        background: #E95420;
+        border-color: transparent;
+        color: #FFFFFF;
+        font-weight: 800;
+        }
+        .accent:hover { background: #F06434; }
+
+        /* Secondaire */
+        .warn {
+        background: rgba(0,0,0,0.06);
+        border: 1px solid rgba(0,0,0,0.12);
+        color: #1E1E1E;
+        font-weight: 700;
+        }
+        .warn:hover { background: rgba(0,0,0,0.08); }
+
+        /* Chips */
+        .chip {
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid rgba(0,0,0,0.12);
+        }
+        .chip-ok {
+        background: rgba(46, 204, 113, 0.14);
+        color: #134B2C;
+        border-color: rgba(46, 204, 113, 0.22);
+        }
+        .chip-miss {
+        background: rgba(231, 76, 60, 0.12);
+        color: #6A1F17;
+        border-color: rgba(231, 76, 60, 0.22);
+        }
+
+        /* Actionbar */
+        .actionbar {
+        padding: 10px;
+        background: #FFFFFF;
+        border: 0;
+        }
+
+        /* Tabs GNOME-like + icons */
+        .tab-icon { opacity: 0.90; }
+        .tab-text { font-weight: 700; }
+        notebook tab:checked {
+          box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.95);
+        }
+        """
+
+
+    provider = Gtk.CssProvider()
+    provider.load_from_data(css)
+    Gtk.StyleContext.add_provider_for_screen(
+        Gdk.Screen.get_default(),
+        provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+    )
+
+def migrate_enabled_images(cfg: dict) -> None:
+    enabled = cfg.get("enabled_images")
+    if not isinstance(enabled, dict) or not enabled:
+        return
+
+    theme = (cfg.get("wallpaper_theme") or "default").strip() or "default"
+    out = {}
+    changed = False
+
+    for k, v in enabled.items():
+        if isinstance(k, str) and k.startswith("templates/"):
+            out[k] = v
+            continue
+
+        if isinstance(k, str) and (k.startswith("base/") or k.startswith("meteo/")):
+            kind, rest = k.split("/", 1)
+            nk = f"templates/{theme}/{kind}/{rest}"
+            out[nk] = v
+            changed = True
+            continue
+
+        out[k] = v
+
+    if changed:
+        cfg["enabled_images"] = out
+        
+def make_tab_label(text: str, icon_name: str) -> Gtk.Widget:
+    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+    img = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.MENU)
+    img.set_pixel_size(16)
+    img.get_style_context().add_class("tab-icon")
+    lbl = Gtk.Label(label=text)
+    lbl.get_style_context().add_class("tab-text")
+    box.pack_start(img, False, False, 0)
+    box.pack_start(lbl, False, False, 0)
+    box.show_all()
+    return box
+
+
+
+# ---------------- Dashboard prettifier ----------------
+
+BUCKET_LABELS = {
+    "clear": ("Clair", "☀️"),
+    "cloudy": ("Nuageux", "☁️"),
+    "fog": ("Brouillard", "🌫️"),
+    "rain": ("Pluie", "🌧️"),
+    "snow": ("Neige", "❄️"),
+    "thunder": ("Orage", "⛈️"),
+}
+
+MOMENT_LABELS = {
+    "aube": "Aube",
+    "midi": "Midi",
+    "coucher": "Coucher",
+    "nuit": "Nuit",
+}
+
+def prettify_meteo_log(line: str) -> str:
+    """
+    Convert a raw wallpaper-smart.sh journal line into a user-friendly text.
+    Expected pattern inside line:
+      moment=... | bucket=... | prefix=... | code=... | LAT=... LON=...
+    """
+    import re
+
+    m = re.search(
+        r"moment=(\w+)\s*\|\s*bucket=(\w+)\s*\|\s*prefix=([^\s|]+)\s*\|\s*code=(\d+)\s*\|\s*LAT=([-\d.]+)\s*LON=([-\d.]+)",
+        line,
+    )
+
+    # If no match, keep it short but still readable
+    if not m:
+        s = (line or "").strip()
+        if len(s) > 160:
+            s = s[:160] + "…"
+        return s or "—"
+
+    moment, bucket, _prefix, code, lat, lon = m.groups()
+
+    moment_txt = MOMENT_LABELS.get(moment, moment)
+    meteo_txt, emoji = BUCKET_LABELS.get(bucket, (bucket, "🌡️"))
+
+    # Extract HH:MM:SS from journal line if present
+    mt = re.search(r"\b(\d{2}:\d{2}:\d{2})\b", line)
+    t = mt.group(1) if mt else None
+
+    #parts = [f"{emoji} {meteo_txt} • {moment_txt}"]
+    parts = [f"{emoji} {meteo_txt} "]
+
+    # Keep details but in a friendly compact way
+    parts.append(f"Code {code}")
+
+    #try:
+    #    parts.append(f"{float(lat):.2f}, {float(lon):.2f}")
+    #except Exception:
+    #    pass
+
+    #if t:
+    #    parts.append(f"{t}")
+
+    return "  ·  ".join(parts)
+
+def prettify_wallpaper_log(line: str) -> str:
+    """
+    Extract only the wallpaper path from a wallpaper-smart.sh log line
+    and return a friendly text with an image icon.
+    Example output:
+      🖼️ /home/user/Images/wallpaper/meteo/neige_midi.png
+    """
+    import re
+
+    m = re.search(r"\bWallpaper:\s*([^\s]+)", line)
+
+    # If no match, keep it short but still readable
+    if not m:
+        s = (line or "").strip()
+        if len(s) > 160:
+            s = s[:160] + "…"
+        return s or "—"
+
+    wallpaper_path = m.group(1)
+    return f"🖼️ {wallpaper_path}"
+
+
+
+# ---------------- Helpers ----------------
+
+def run(cmd, check=False):
+    p = subprocess.run(cmd, text=True, capture_output=True)
+    if check and p.returncode != 0:
+        raise RuntimeError(f"{' '.join(cmd)}\n{p.stderr.strip()}")
+    return p
+
+def load_cfg():
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    if not CFG_PATH.exists():
+        save_cfg(DEFAULT_CFG)
+    with open(CFG_PATH, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+
+    # upgrade-soft
+    if "enabled_images" not in cfg or not isinstance(cfg["enabled_images"], dict):
+        cfg["enabled_images"] = {}
+        save_cfg(cfg)
+
+    # upgrade-soft: geolocation preset
+    if "geolocation" not in cfg or not isinstance(cfg.get("geolocation"), dict):
+        cfg["geolocation"] = DEFAULT_CFG["geolocation"].copy()
+        save_cfg(cfg)
+    if "preset" not in cfg["geolocation"]:
+        cfg["geolocation"]["preset"] = "none"
+        save_cfg(cfg)
+
+    return cfg
+
+def save_cfg(cfg):
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    with open(CFG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+def ensure_overrides(cfg):
+    user_systemd = Path.home() / ".config" / "systemd" / "user"
+    (user_systemd / f"{SERVICE}.d").mkdir(parents=True, exist_ok=True)
+    (user_systemd / f"{TIMER}.d").mkdir(parents=True, exist_ok=True)
+
+    (user_systemd / f"{SERVICE}.d" / "override.conf").write_text(
+        "[Service]\n"
+        f"Environment=CONFIG_FILE={CFG_PATH}\n",
+        encoding="utf-8"
+    )
+
+    minutes = int(cfg.get("timer_minutes", 10))
+    (user_systemd / f"{TIMER}.d" / "override.conf").write_text(
+        "[Timer]\n"
+        f"OnUnitActiveSec={minutes}min\n",
+        encoding="utf-8"
+    )
+
+    run(["systemctl", "--user", "daemon-reload"])
+
+def is_timer_active():
+    p = run(["systemctl", "--user", "is-active", TIMER])
+    return p.returncode == 0 and p.stdout.strip() == "active"
+
+def set_timer(enabled: bool):
+    if enabled:
+        run(["systemctl", "--user", "enable", "--now", TIMER], check=True)
+    else:
+        run(["systemctl", "--user", "disable", "--now", TIMER], check=True)
+
+def pick_file(parent, title, initial_dir: Path):
+    dlg = Gtk.FileChooserDialog(
+        title=title,
+        parent=parent,
+        action=Gtk.FileChooserAction.OPEN,
+    )
+    dlg.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+    if initial_dir.exists():
+        dlg.set_current_folder(str(initial_dir))
+
+    filt = Gtk.FileFilter()
+    filt.set_name("Images")
+    for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+        filt.add_pattern(ext)
+    dlg.add_filter(filt)
+
+    path = None
+    if dlg.run() == Gtk.ResponseType.OK:
+        path = dlg.get_filename()
+    dlg.destroy()
+    return path
+
+def load_pixbuf_scaled(path: Path, max_w=420, max_h=240):
+    if not path.exists():
+        return None
+    pb = GdkPixbuf.Pixbuf.new_from_file(str(path))
+    w, h = pb.get_width(), pb.get_height()
+    scale = min(max_w / w, max_h / h)
+    new_w = max(1, int(w * scale))
+    new_h = max(1, int(h * scale))
+    return pb.scale_simple(new_w, new_h, GdkPixbuf.InterpType.BILINEAR)
+
+def make_page(child: Gtk.Widget):
+    # Chaque onglet est scrollable : l'actionbar reste toujours visible.
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    box.get_style_context().add_class("page")
+    box.set_vexpand(True)
+    box.pack_start(child, False, False, 0)
+
+    sc = Gtk.ScrolledWindow()
+    sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    sc.set_hexpand(True)
+    sc.set_vexpand(True)
+    sc.add(box)  # GTK3 crée un Viewport automatiquement si besoin
+    return sc
+
+def make_card(title: str, content: Gtk.Widget):
+    card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    card.get_style_context().add_class("card")
+
+    t = Gtk.Label(label=title, xalign=0)
+    t.get_style_context().add_class("card-title")
+
+    card.pack_start(t, False, False, 0)
+    card.pack_start(content, True, True, 0)
+    return card
+
+
+# ---------------- UI ----------------
+
+class App(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Wallpaper Smart – Paramètres")
+
+        self._dark = detect_dark_mode()
+        apply_css(self._dark)
+
+        try:
+            # GNOME 42+: key may or may not exist depending on version
+            self._gnome_iface = Gio.Settings.new("org.gnome.desktop.interface")
+            try:
+                # will raise if key doesn't exist
+                self._gnome_iface.get_string("color-scheme")
+                self._gnome_iface.connect("changed::color-scheme", self._on_theme_change)
+            except Exception:
+                pass
+        except Exception:
+            self._gnome_iface = None
+
+        try:
+            Gtk.Settings.get_default().connect(
+                "notify::gtk-application-prefer-dark-theme",
+                self._on_theme_change
+            )
+        except Exception:
+            pass
+
+        self.set_border_width(10)
+        self.set_default_size(1020, 720)
+        self.set_resizable(True)
+
+        self.cfg = load_cfg()
+        self.wallpaper_themes = load_wallpaper_themes(self.cfg.get("wallpaper_dir", ""))
+
+        # Images tab state (sélection de moment)
+        self.images_selected_moment = None
+
+        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        self.add(root)
+
+        # Header
+        header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        header.get_style_context().add_class("header")
+
+        title = Gtk.Label(label="Wallpaper Smart", xalign=0)
+        title.get_style_context().add_class("header-title")
+
+        sub = Gtk.Label(label="Fond d’écran dynamique • heure + météo • style GNOME", xalign=0)
+        sub.get_style_context().add_class("header-sub")
+
+        header.pack_start(title, False, False, 0)
+        header.pack_start(sub, False, False, 0)
+        root.pack_start(header, False, False, 0)
+
+        # Notebook
+        self.nb = Gtk.Notebook()
+        root.pack_start(self.nb, True, True, 0)
+
+        self.nb.append_page(self.build_tab_general(), make_tab_label("Général", "preferences-system-symbolic"))
+        self.nb.append_page(self.build_tab_time(),    make_tab_label("Time",    "alarm-symbolic"))
+        self.nb.append_page(self.build_tab_geoloc(),  make_tab_label("Géoloc",   "mark-location-symbolic"))
+        self.nb.append_page(self.build_tab_mapping(), make_tab_label("Mapping", "view-list-symbolic"))
+
+        # Images: garder une référence pour rebuild safe
+        self.images_tab = self.build_tab_images()
+        self.nb.append_page(self.images_tab, make_tab_label("Images", "image-x-generic-symbolic"))
+
+        # Action bar
+        bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        bar.get_style_context().add_class("actionbar")
+        root.pack_end(bar, False, False, 0)
+
+        btn_save = Gtk.Button(label="Enregistrer")
+        btn_save.get_style_context().add_class("accent")
+        btn_save.connect("clicked", self.on_save)
+
+        btn_test = Gtk.Button(label="Tester maintenant")
+        btn_test.get_style_context().add_class("warn")
+        btn_test.connect("clicked", self.on_test)
+
+        btn_logs = Gtk.Button(label="Voir logs")
+        btn_logs.connect("clicked", self.on_logs)
+
+        self.btn_toggle = Gtk.Button()
+        self.btn_toggle.connect("clicked", self.on_toggle_timer)
+        self.refresh_toggle_label()
+
+        bar.pack_start(btn_save, False, False, 0)
+        bar.pack_start(btn_test, False, False, 0)
+        bar.pack_start(btn_logs, False, False, 0)
+        bar.pack_end(self.btn_toggle, False, False, 0)
+
+    def _refresh_theme_combo_items(self):
+        if not hasattr(self, "wall_theme_combo"):
+            return
+
+        current = self.cfg.get("wallpaper_theme", "default")
+        themes = getattr(self, "wallpaper_themes", []) or [("default", "Defaut")]
+
+        self.wall_theme_combo.handler_block_by_func(self.on_wall_theme_changed)
+
+        self.wall_theme_combo.remove_all()
+        for key, label in themes:
+            self.wall_theme_combo.append(key, label)
+
+        if current not in [k for k, _ in themes]:
+            current = themes[0][0]
+
+        self.wall_theme_combo.set_active_id(current)
+
+        self.wall_theme_combo.handler_unblock_by_func(self.on_wall_theme_changed)
+
+    def _on_theme_change(self, *args):
+        try:
+            self._dark = detect_dark_mode()
+            apply_css(self._dark)
+            self.queue_draw()
+        except Exception:
+            pass
+    
+    def _get_theme_id_from_ui_or_cfg(self) -> str:
+        theme = None
+        if hasattr(self, "wall_theme_combo"):
+            theme = self.wall_theme_combo.get_active_id()
+        if not theme:
+            theme = self.cfg.get("wallpaper_theme")
+        theme = (theme or "default").strip()
+        return theme or "default"
+
+
+    def _theme_dir(self, root: Path) -> Path:
+        theme = self._get_theme_id_from_ui_or_cfg()
+        return root / "templates" / theme
+
+
+    def _rel_path(self, kind: str, filename: str) -> str:
+        theme = self._get_theme_id_from_ui_or_cfg()
+        return f"templates/{theme}/{kind}/{filename}"
+    # ------- Tabs -------
+    def build_tab_general(self):
+        # Dashboard + dossier
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        # --- Dashboard (état) ---
+        self.dashboard_card = self.build_dashboard_card()
+        page.pack_start(self.dashboard_card, False, False, 0)
+
+        # --- Wallpaper theme ---
+        self.wall_theme_card = self.build_wallpaper_theme_card()
+        page.pack_start(self.wall_theme_card, False, False, 0)
+        
+        # --- Dossier wallpapers ---
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.folder_entry = Gtk.Entry()
+        self.folder_entry.set_text(self.cfg["wallpaper_dir"])
+
+        btn_choose = Gtk.Button(label="Choisir…")
+        btn_choose.connect("clicked", self.on_choose_folder)
+
+        btn_open = Gtk.Button(label="Ouvrir")
+        btn_open.connect("clicked", self.on_open_folder)
+
+        row.pack_start(self.folder_entry, True, True, 0)
+        row.pack_start(btn_choose, False, False, 0)
+        row.pack_start(btn_open, False, False, 0)
+
+        help_lbl = Gtk.Label(
+            label="Base: templates/<theme>/base/{aube,midi,coucher,nuit}.png • Meteo: templates/<theme>/meteo/<prefix>_<moment>.png",
+            xalign=0
+        )
+        help_lbl.set_line_wrap(True)
+        help_lbl.get_style_context().add_class("muted")
+
+        content.pack_start(row, False, False, 0)
+        content.pack_start(help_lbl, False, False, 0)
+
+        page.pack_start(make_card("Dossier wallpapers", content), False, False, 0)
+        
+        
+
+
+        # Refresh dashboard once UI is built
+        self.refresh_dashboard()
+        return make_page(page)
+
+    def build_wallpaper_theme_card(self) -> Gtk.Widget:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        lab = Gtk.Label(label="Theme", xalign=0)
+        lab.get_style_context().add_class("muted")
+        row.pack_start(lab, False, False, 0)
+
+        self.wall_theme_combo = Gtk.ComboBoxText()
+        themes = getattr(self, "wallpaper_themes", None)
+        if not themes:
+            themes = load_wallpaper_themes(self.cfg.get("wallpaper_dir", ""))
+
+        for key, label in themes:
+            self.wall_theme_combo.append(key, label)
+
+        current = (self.cfg.get("wallpaper_theme") or "default")
+        if current not in [k for k, _ in themes]:
+            current = "default"
+        self.wall_theme_combo.set_active_id(current)
+
+        self.wall_theme_combo.connect("changed", self.on_wall_theme_changed)
+
+        row.pack_start(self.wall_theme_combo, True, True, 0)
+        box.pack_start(row, False, False, 0)
+
+        help_lbl = Gtk.Label(
+            label="Choisit un theme de wallpapers (section UI seulement pour le moment).",
+            xalign=0
+        )
+        help_lbl.set_line_wrap(True)
+        help_lbl.get_style_context().add_class("muted")
+        box.pack_start(help_lbl, False, False, 0)
+
+        return make_card("Theme wallpapers", box)
+    
+
+    def on_wall_theme_changed(self, _combo):
+        theme_id = self.wall_theme_combo.get_active_id() or "default"
+        self.cfg["wallpaper_theme"] = theme_id
+        self.rebuild_images_tab(focus=False)
+        self.refresh_images_preview()
+        
+    def build_dashboard_card(self) -> Gtk.Widget:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        title = Gtk.Label(label="État", xalign=0)
+        title.get_style_context().add_class("card-title")
+        top.pack_start(title, True, True, 0)
+
+        btn_refresh = Gtk.Button(label="Rafraîchir")
+        btn_refresh.connect("clicked", lambda _b: self.refresh_dashboard())
+        top.pack_end(btn_refresh, False, False, 0)
+        box.pack_start(top, False, False, 0)
+
+        grid = Gtk.Grid(column_spacing=12, row_spacing=8)
+        box.pack_start(grid, False, False, 0)
+
+        def chip():
+            c = Gtk.Label(label="", xalign=0)
+            c.get_style_context().add_class("chip")
+            return c
+
+        def row(y, label_text, widget):
+            lab = Gtk.Label(label=label_text, xalign=0)
+            lab.get_style_context().add_class("muted")
+            grid.attach(lab, 0, y, 1, 1)
+            grid.attach(widget, 1, y, 1, 1)
+
+        self.dash_timer = chip()
+        self.dash_moment = Gtk.Label(label="—", xalign=0)
+        self.dash_meteo = Gtk.Label(label="—", xalign=0)
+        self.dash_loc = Gtk.Label(label="—", xalign=0)
+        self.dash_wall = Gtk.Label(label="—", xalign=0)
+        self.dash_wall.set_line_wrap(True)
+
+        row(0, "Timer", self.dash_timer)
+        row(1, "Moment / heure", self.dash_moment)
+        row(2, "Météo", self.dash_meteo)
+        row(3, "Localisation", self.dash_loc)
+        row(4, "Dernier fond", self.dash_wall)
+
+        hint = Gtk.Label(
+            label="Astuce : \"Tester maintenant\" applique une config temporaire (sans enregistrer).",
+            xalign=0
+        )
+        hint.set_line_wrap(True)
+        hint.get_style_context().add_class("muted")
+        box.pack_start(hint, False, False, 0)
+
+        return make_card("Dashboard", box)
+
+    def _set_chip(self, w: Gtk.Label, ok: bool, text: str):
+        ctx = w.get_style_context()
+        # Remove previous state classes
+        ctx.remove_class("chip-ok")
+        ctx.remove_class("chip-miss")
+        ctx.add_class("chip-ok" if ok else "chip-miss")
+        w.set_text(text)
+
+    def refresh_dashboard(self):
+        """Update dashboard values from config + last service logs."""
+        try:
+            # Timer status
+            active = is_timer_active()
+            self._set_chip(self.dash_timer, active, "Actif" if active else "Désactivé")
+
+            # Moment (from schedule)
+            import datetime
+            now = datetime.datetime.now()
+            hour = now.hour
+            sch = self.cfg.get("schedule", {})
+            nuit = int(sch.get("nuit_start", 19))
+            aube = int(sch.get("aube_start", 5))
+            midi = int(sch.get("midi_start", 11))
+            coucher = int(sch.get("coucher_start", 17))
+
+            moment = "nuit"
+            if aube <= hour < midi:
+                moment = "aube"
+            elif midi <= hour < coucher:
+                moment = "midi"
+            else:
+                # coucher window depends on nuit start
+                if coucher < nuit:
+                    moment = "coucher" if coucher <= hour < nuit else "nuit"
+                else:
+                    moment = "coucher" if (hour >= coucher or hour < nuit) else "nuit"
+
+            moment_txt = MOMENT_LABELS.get(moment, moment)
+            self.dash_moment.set_text(f"{moment_txt} - {now.strftime('%Hh%M')}")
+
+            # Geoloc summary
+            geo = self.cfg.get("geolocation", {})
+            mode = geo.get("mode", "auto_ip")
+            preset = geo.get("preset", "none")
+            fixed = geo.get("fixed", {})
+            city = geo.get("city_name", "")
+
+            if preset and preset != "none" and preset in GEO_PRESETS:
+                label, coords = GEO_PRESETS[preset]
+                self.dash_loc.set_text(f"Preset: {label} ({coords[0]:.4f}, {coords[1]:.4f})")
+            elif mode == "fixed":
+                self.dash_loc.set_text(f"Manuel: {fixed.get('lat', '—')}, {fixed.get('lon', '—')}")
+            elif mode == "city":
+                self.dash_loc.set_text(f"Ville: {city}")
+            else:
+                self.dash_loc.set_text(f"Auto: {city} - {fixed.get('lat', '—')}, {fixed.get('lon', '—')} ")
+
+            # Weather + last applied wallpaper from journalctl (best effort)
+            #p = run(["journalctl", "--user", "-u", SERVICE, "-n", "80", "--no-pager"])
+            #logs = p.stdout.splitlines()
+
+            try:
+                # 1) Construire une config temporaire depuis l'UI (sans sauvegarder la vraie)
+                cfg = json.loads(json.dumps(self.cfg))  # copie safe
+
+                # Wallpaper dir
+                if hasattr(self, "folder_entry"):
+                    cfg["wallpaper_dir"] = self.folder_entry.get_text().strip()
+
+                # Timer
+                if hasattr(self, "spin_minutes"):
+                    cfg["timer_minutes"] = int(self.spin_minutes.get_value())
+
+                # Schedule
+                if hasattr(self, "spin_nuit"):
+                    cfg["schedule"] = {
+                        "nuit_start": int(self.spin_nuit.get_value()),
+                        "aube_start": int(self.spin_aube.get_value()),
+                        "midi_start": int(self.spin_midi.get_value()),
+                        "coucher_start": int(self.spin_coucher.get_value()),
+                    }
+
+                # Geoloc (mode + lat/lon + city + preset)
+                cfg.setdefault("geolocation", {})
+                if hasattr(self, "geo_combo"):
+                    cfg["geolocation"]["mode"] = self.geo_combo.get_active_text()
+
+                if hasattr(self, "lat_entry") and hasattr(self, "lon_entry"):
+                    try:
+                        cfg["geolocation"].setdefault("fixed", {})
+                        cfg["geolocation"]["fixed"]["lat"] = float(self.lat_entry.get_text().strip())
+                        cfg["geolocation"]["fixed"]["lon"] = float(self.lon_entry.get_text().strip())
+                    except Exception:
+                        pass
+
+                if hasattr(self, "city_entry"):
+                    cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
+
+                if hasattr(self, "preset_combo"):
+                    # value stored in combo id
+                    preset_id = self.preset_combo.get_active_id() or "none"
+                    cfg["geolocation"]["preset"] = preset_id
+
+                # Mapping
+                if hasattr(self, "map_entries"):
+                    cfg.setdefault("weather_mapping", {})
+                    for k, e in self.map_entries.items():
+                        cfg["weather_mapping"][k] = e.get_text().strip()
+
+                # enabled_images
+                cfg.setdefault("enabled_images", self.cfg.get("enabled_images", {}))
+
+                # 2) Ecrire config temporaire
+                tmp = APP_DIR / "config.test.json"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+                # 3) Lancer wallpaper-smart.sh avec la config temporaire
+                script = Path.home() / ".local/bin/wallpaper-smart.sh"
+                p = subprocess.run(
+                    [str(script)],
+                    text=True,
+                    capture_output=True,
+                    env={**os.environ, "CONFIG_FILE": str(tmp)},
+                )
+
+                logs = p.stdout.splitlines()
+            except Exception as e:
+                self.message("Erreur test", str(e))
+
+            wall_line = None
+            meta_line = None
+            for line in reversed(logs):
+                if "✅ Wallpaper:" in line or "Wallpaper:" in line:
+                    wall_line = line.strip()
+                    break
+            for line in reversed(logs):
+                if "moment=" in line and "code=" in line:
+                    meta_line = line.strip()
+                    break
+                    
+            if meta_line:
+                self.dash_meteo.set_text(prettify_meteo_log(meta_line))
+            else:
+                self.dash_meteo.set_text("—")
+
+            if wall_line:
+                self.dash_wall.set_text(prettify_wallpaper_log(wall_line))
+            else:
+                # fallback: current.png path
+                wdir = self.cfg.get("wallpaper_dir", str(Path.home() / "Images" / "wallpaper"))
+                cur = Path(wdir) / "current.png"
+                self.dash_wall.set_text(str(cur) if cur.exists() else "—")
+        except Exception as e:
+            # Don't crash the UI for dashboard refresh
+            try:
+                self.dash_meteo.set_text(f"Erreur dashboard: {e}")
+            except Exception:
+                pass
+
+    def build_tab_time(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        grid = Gtk.Grid(column_spacing=10, row_spacing=8)
+
+        def spin(value):
+            s = Gtk.SpinButton.new_with_range(0, 23, 1)
+            s.set_value(int(value))
+            return s
+
+        sch = self.cfg["schedule"]
+        self.spin_nuit = spin(sch["nuit_start"])
+        self.spin_aube = spin(sch["aube_start"])
+        self.spin_midi = spin(sch["midi_start"])
+        self.spin_coucher = spin(sch["coucher_start"])
+
+        rows = [
+            ("Nuit start", self.spin_nuit),
+            ("Aube start", self.spin_aube),
+            ("Midi start", self.spin_midi),
+            ("Coucher start", self.spin_coucher),
+        ]
+        for i, (t, w) in enumerate(rows):
+            grid.attach(Gtk.Label(label=t, xalign=0), 0, i, 1, 1)
+            grid.attach(w, 1, i, 1, 1)
+
+        row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.spin_minutes = Gtk.SpinButton.new_with_range(1, 240, 1)
+        self.spin_minutes.set_value(int(self.cfg.get("timer_minutes", 10)))
+
+        lbl = Gtk.Label(label="Toutes les (minutes) :", xalign=0)
+        lbl.get_style_context().add_class("muted")
+        row2.pack_start(lbl, False, False, 0)
+        row2.pack_start(self.spin_minutes, False, False, 0)
+
+        box.pack_start(make_card("Horaires", grid), False, False, 0)
+        box.pack_start(make_card("Fréquence", row2), False, False, 0)
+
+        return make_page(box)
+
+    def build_tab_geoloc(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        self.geo_combo = Gtk.ComboBoxText()
+        for t in ["auto_ip", "fixed", "city"]:
+            self.geo_combo.append_text(t)
+        self.geo_combo.set_active(["auto_ip", "fixed", "city"].index(self.cfg["geolocation"]["mode"]))
+
+        mode_lbl = Gtk.Label(label="Mode", xalign=0)
+        mode_lbl.get_style_context().add_class("muted")
+        content.pack_start(mode_lbl, False, False, 0)
+        content.pack_start(self.geo_combo, False, False, 0)
+
+        self.geo_combo.connect("changed", self.on_geo_mode_changed)
+
+        # Preset (simulation météo)
+        preset_lbl = Gtk.Label(label="Preset (simulation)", xalign=0)
+        preset_lbl.get_style_context().add_class("muted")
+
+        self.preset_combo = Gtk.ComboBoxText()
+        for key, (label, _coords) in GEO_PRESETS.items():
+            self.preset_combo.append(key, label)
+
+        cur_preset = self.cfg.get("geolocation", {}).get("preset", "none")
+        if cur_preset not in GEO_PRESETS:
+            cur_preset = "none"
+        self.preset_combo.set_active_id(cur_preset)
+        self.preset_combo.connect("changed", self.on_geo_preset_changed)
+
+        content.pack_start(preset_lbl, False, False, 0)
+        content.pack_start(self.preset_combo, False, False, 0)
+
+        fixed = self.cfg["geolocation"]["fixed"]
+        self.lat_entry = Gtk.Entry(); self.lat_entry.set_text(str(fixed["lat"]))
+        self.lon_entry = Gtk.Entry(); self.lon_entry.set_text(str(fixed["lon"]))
+        self.city_entry = Gtk.Entry(); self.city_entry.set_text(self.cfg["geolocation"]["city_name"])
+
+        g = Gtk.Grid(column_spacing=10, row_spacing=8)
+        g.attach(Gtk.Label(label="Lat", xalign=0), 0, 0, 1, 1)
+        g.attach(self.lat_entry, 1, 0, 1, 1)
+        g.attach(Gtk.Label(label="Lon", xalign=0), 0, 1, 1, 1)
+        g.attach(self.lon_entry, 1, 1, 1, 1)
+        g.attach(Gtk.Label(label="Ville", xalign=0), 0, 2, 1, 1)
+        g.attach(self.city_entry, 1, 2, 1, 1)
+
+        content.pack_start(g, False, False, 0)
+
+        hint = Gtk.Label(
+            label="Astuce: 'city' utilise OpenStreetMap (Nominatim). À utiliser pour config, pas en polling intensif.",
+            xalign=0
+        )
+        hint.set_line_wrap(True)
+        hint.get_style_context().add_class("muted")
+        content.pack_start(hint, False, False, 0)
+
+        # appliquer sensitivité initiale
+        self.refresh_geoloc_controls()
+
+        box.pack_start(make_card("Géolocalisation", content), False, False, 0)
+        return make_page(box)
+
+    def build_tab_mapping(self):
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        grid = Gtk.Grid(column_spacing=10, row_spacing=8)
+        self.map_entries = {}
+        wm = self.cfg["weather_mapping"]
+
+        for i, key in enumerate(WEATHER_KEYS_ORDER):
+            e = Gtk.Entry()
+            e.set_text(wm.get(key, ""))
+            self.map_entries[key] = e
+            grid.attach(Gtk.Label(label=key, xalign=0), 0, i, 1, 1)
+            grid.attach(e, 1, i, 1, 1)
+
+        hint = Gtk.Label(label="Ex: rain=pluie → fichiers attendus: meteo/pluie_aube.png, meteo/pluie_midi.png, ...", xalign=0)
+        hint.set_line_wrap(True)
+        hint.get_style_context().add_class("muted")
+
+        content.pack_start(grid, False, False, 0)
+        content.pack_start(hint, False, False, 0)
+
+        return make_page(make_card("Mapping météo → préfixes", content))
+
+
+    def build_tab_images(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        btn_refresh = Gtk.Button(label="Rafraîchir")
+        btn_refresh.connect("clicked", lambda _b: self.refresh_images_preview())
+        top.pack_start(btn_refresh, False, False, 0)
+
+        btn_placeholders = Gtk.Button(label="Créer placeholders")
+        btn_placeholders.connect("clicked", self.on_create_placeholders)
+        top.pack_start(btn_placeholders, False, False, 0)
+
+        btn_open_base = Gtk.Button(label="Ouvrir base/")
+        btn_open_base.connect("clicked", lambda _b: self._open_subdir("base", themed=True))
+        top.pack_start(btn_open_base, False, False, 0)
+
+        btn_open_meteo = Gtk.Button(label="Ouvrir meteo/")
+        btn_open_meteo.connect("clicked", lambda _b: self._open_subdir("meteo", themed=True))
+        top.pack_start(btn_open_meteo, False, False, 0)
+
+        page.pack_start(make_card("Actions", top), False, False, 0)
+
+        # Split view 50/50 (modifiable ensuite en glissant)
+        paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        page.pack_start(paned, True, True, 0)
+
+        # Positionner 50% une seule fois (sinon l'utilisateur ne peut jamais ajuster)
+        self._paned_inited = False
+
+        def _paned_50(_w, alloc):
+            if self._paned_inited:
+                return
+            try:
+                paned.set_position(int(alloc.width * 0.5))
+                self._paned_inited = True
+            except Exception:
+                pass
+
+        paned.connect("size-allocate", _paned_50)
+
+        # State
+        self.images_selected_moment = getattr(self, "images_selected_moment", None) or None
+
+        # Panels
+        base_panel = self._build_base_panel()
+        meteo_items = self._build_meteo_items_from_mapping()
+        meteo_panel = self._build_meteo_panel(meteo_items)
+
+        paned.pack1(base_panel, resize=True, shrink=False)
+        paned.pack2(meteo_panel, resize=True, shrink=False)
+
+        # Refresh previews + default selection = moment courant
+        self.refresh_images_preview()
+        try:
+            moment_now = self._compute_current_moment_key()
+            self._select_base_moment(moment_now)
+        except Exception:
+            pass
+
+        return make_page(page)
+
+    def _compute_current_moment_key(self) -> str:
+        """Return current moment according to schedule and current hour."""
+        from datetime import datetime
+        hour = datetime.now().hour
+        sch = self.cfg.get("schedule", {})
+        nuit = int(sch.get("nuit_start", 19))
+        aube = int(sch.get("aube_start", 5))
+        midi = int(sch.get("midi_start", 11))
+        coucher = int(sch.get("coucher_start", 17))
+
+        # Simple windows: [aube, midi), [midi, coucher), [coucher, nuit), else nuit
+        if aube <= hour < midi:
+            return "aube"
+        if midi <= hour < coucher:
+            return "midi"
+
+        # Handle coucher/nuit even if schedule is unusual
+        if coucher < nuit:
+            if coucher <= hour < nuit:
+                return "coucher"
+            return "nuit"
+        else:
+            # coucher window wraps midnight
+            if hour >= coucher or hour < nuit:
+                return "coucher"
+            return "nuit"
+
+    def _set_meteo_title(self, moment_key: str):
+        moment_label = dict(MOMENTS).get(moment_key, moment_key)
+        if getattr(self, "meteo_title_label", None):
+            self.meteo_title_label.set_text(f"Météo — {moment_label}")
+
+    def _select_base_moment(self, moment_key: str):
+        """Select a base moment in the left list + apply filter on the right."""
+        if not getattr(self, "base_rows", None):
+            return
+        if moment_key not in self.base_rows:
+            return
+        row = self.base_rows[moment_key][0]
+        if getattr(self, "base_list", None):
+            self.base_list.select_row(row)
+        self.images_selected_moment = moment_key
+        self.apply_meteo_filter(moment_key)
+
+    def _build_base_panel(self) -> Gtk.Widget:
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        outer.get_style_context().add_class("card")
+
+        t = Gtk.Label(label="Base", xalign=0)
+        t.get_style_context().add_class("card-title")
+        outer.pack_start(t, False, False, 0)
+
+        self.base_list = Gtk.ListBox()
+        self.base_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.base_list.set_activate_on_single_click(True)
+        self.base_list.connect("row-selected", self.on_base_selected)
+        outer.pack_start(self.base_list, True, True, 0)
+
+        # moment_key -> (row, img, path_lbl, chip_lbl, current_chip)
+        self.base_rows = {}
+
+        for moment_key, moment_label in MOMENTS:
+            row = Gtk.ListBoxRow()
+            row.moment_key = moment_key  # attach
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            row.add(box)
+
+            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            name = Gtk.Label(label=moment_label, xalign=0)
+            header.pack_start(name, True, True, 0)
+
+            chip = Gtk.Label(label="…")
+            chip.get_style_context().add_class("chip")
+            chip.get_style_context().add_class("chip-miss")
+            header.pack_start(chip, False, False, 0)
+
+            current_chip = Gtk.Label(label="ACTUEL")
+            current_chip.get_style_context().add_class("chip")
+            current_chip.get_style_context().add_class("chip-ok")
+            current_chip.set_no_show_all(True)
+            current_chip.hide()
+            header.pack_start(current_chip, False, False, 0)
+
+            btn_pick = Gtk.Button(label="Choisir…")
+            btn_pick.connect("clicked", self.on_pick_image, self._rel_path("base", f"{moment_key}.png"))
+            header.pack_end(btn_pick, False, False, 0)
+
+            img = Gtk.Image()
+            img.set_size_request(420, 240)
+
+            path_lbl = Gtk.Label(label="", xalign=0)
+            path_lbl.set_line_wrap(True)
+            path_lbl.get_style_context().add_class("muted")
+
+            box.pack_start(header, False, False, 0)
+            box.pack_start(img, False, False, 0)
+            box.pack_start(path_lbl, False, False, 0)
+
+            self.base_list.add(row)
+            self.base_rows[moment_key] = (row, img, path_lbl, chip, current_chip)
+
+        self.base_list.show_all()
+        return outer
+
+    def _build_meteo_panel(self, items: List[Tuple[str, str]]) -> Gtk.Widget:
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        outer.get_style_context().add_class("card")
+
+        self.meteo_title_label = Gtk.Label(label="Météo", xalign=0)
+        self.meteo_title_label.get_style_context().add_class("card-title")
+        outer.pack_start(self.meteo_title_label, False, False, 0)
+
+        sc = Gtk.ScrolledWindow()
+        sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        outer.pack_start(sc, True, True, 0)
+
+        v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        v.set_border_width(6)
+        sc.add(v)
+
+        # rel_path -> (img, path_lbl, chip_lbl, switch)
+        self.image_widgets = {}
+        self.meteo_rows = {}
+        self.meteo_row_moment = {}
+
+        for label, rel in items:
+            row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            name = Gtk.Label(label=label, xalign=0)
+            header.pack_start(name, True, True, 0)
+
+            chip = Gtk.Label(label="…")
+            chip.get_style_context().add_class("chip")
+            chip.get_style_context().add_class("chip-miss")
+            header.pack_start(chip, False, False, 0)
+
+            active_lbl = Gtk.Label(label="Actif", xalign=0)
+            active_lbl.get_style_context().add_class("muted")
+
+            active_sw = Gtk.Switch()
+            active_sw.set_active(True)
+            active_sw.get_style_context().add_class("ws-switch")
+            hid = active_sw.connect("notify::active", self.on_toggle_image_enabled, rel)
+            active_sw._hid_active = hid
+
+            header.pack_start(active_lbl, False, False, 0)
+            header.pack_start(active_sw, False, False, 0)
+
+            btn_pick = Gtk.Button(label="Choisir…")
+            btn_pick.connect("clicked", self.on_pick_image, rel)
+            header.pack_end(btn_pick, False, False, 0)
+
+            img = Gtk.Image()
+            img.set_size_request(420, 240)
+
+            path_lbl = Gtk.Label(label="", xalign=0)
+            path_lbl.set_line_wrap(True)
+            path_lbl.get_style_context().add_class("muted")
+
+            row.pack_start(header, False, False, 0)
+            row.pack_start(img, False, False, 0)
+            row.pack_start(path_lbl, False, False, 0)
+
+            v.pack_start(row, False, False, 0)
+
+            self.image_widgets[rel] = (img, path_lbl, chip, active_sw)
+            self.meteo_rows[rel] = row
+
+            mk = None
+            for moment_key, _moment_label in MOMENTS:
+                if rel.endswith(f"_{moment_key}.png"):
+                    mk = moment_key
+                    break
+            self.meteo_row_moment[rel] = mk
+
+        v.show_all()
+
+        # Title defaults to moment courant
+        try:
+            self._set_meteo_title(self._compute_current_moment_key())
+        except Exception:
+            pass
+
+        return outer
+
+    def on_base_selected(self, _listbox, row):
+        if not row:
+            return
+        moment = getattr(row, "moment_key", None)
+        if not moment:
+            return
+        self.images_selected_moment = moment
+        self.apply_meteo_filter(moment)
+
+    def apply_meteo_filter(self, moment_key: str):
+        """Show only meteo rows matching the selected moment."""
+        self._set_meteo_title(moment_key)
+        if not getattr(self, "meteo_rows", None):
+            return
+        for rel, row in self.meteo_rows.items():
+            mk = self.meteo_row_moment.get(rel)
+            row.set_visible(bool(mk == moment_key))
+
+
+    def _build_meteo_items_from_mapping(self) -> List[Tuple[str, str]]:
+        mapping = {}
+        if hasattr(self, "map_entries") and self.map_entries:
+            for k in WEATHER_KEYS_ORDER:
+                mapping[k] = self.map_entries[k].get_text().strip()
+        else:
+            mapping = self.cfg.get("weather_mapping", {})
+
+        items: List[Tuple[str, str]] = []
+        for key in WEATHER_KEYS_ORDER:
+            prefix = (mapping.get(key) or "").strip()
+            if not prefix:
+                continue
+            for moment_key, _moment_label in MOMENTS:
+                label = f"{prefix}_{moment_key}"
+                rel = self._rel_path("meteo", f"{prefix}_{moment_key}.png")
+                items.append((label, rel))
+        return items
+
+    def _images_group(self, title: str, items: List[Tuple[str, str]], allow_toggle: bool):
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        outer.get_style_context().add_class("card")
+
+        t = Gtk.Label(label=title, xalign=0)
+        t.get_style_context().add_class("card-title")
+        outer.pack_start(t, False, False, 0)
+
+        sc = Gtk.ScrolledWindow()
+        sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        outer.pack_start(sc, True, True, 0)
+
+        v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        v.set_border_width(6)
+        sc.add(v)
+
+        for label, rel in items:
+            row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            name = Gtk.Label(label=label, xalign=0)
+            header.pack_start(name, True, True, 0)
+
+            chip = Gtk.Label(label="…")
+            chip.get_style_context().add_class("chip")
+            chip.get_style_context().add_class("chip-miss")
+            header.pack_start(chip, False, False, 0)
+
+            active_cb = Gtk.CheckButton(label="Actif")
+            active_cb.set_active(True)
+            if allow_toggle:
+                hid = active_cb.connect("toggled", self.on_toggle_image_enabled, rel)
+                active_cb._hid_toggled = hid
+            else:
+                active_cb.set_sensitive(False)
+            header.pack_start(active_cb, False, False, 0)
+
+            btn_pick = Gtk.Button(label="Choisir…")
+            btn_pick.connect("clicked", self.on_pick_image, rel)
+            header.pack_end(btn_pick, False, False, 0)
+
+            img = Gtk.Image()
+            img.set_size_request(420, 240)
+
+            path_lbl = Gtk.Label(label="", xalign=0)
+            path_lbl.set_line_wrap(True)
+            path_lbl.get_style_context().add_class("muted")
+
+            row.pack_start(header, False, False, 0)
+            row.pack_start(img, False, False, 0)
+            row.pack_start(path_lbl, False, False, 0)
+
+            v.pack_start(row, False, False, 0)
+            self.image_widgets[rel] = (img, path_lbl, chip, active_cb)
+
+        return outer
+
+    # ------- Actions -------
+
+    
+    def rebuild_images_tab(self, focus: bool = True):
+        """Rebuild the Images tab safely (keeps its position, no fixed index)."""
+        try:
+            insert_at = -1
+            if hasattr(self, "images_tab"):
+                insert_at = self.nb.page_num(self.images_tab)
+                if insert_at != -1:
+                    self.nb.remove_page(insert_at)
+
+            self.images_tab = self.build_tab_images()
+            tab_label = make_tab_label("Images", "image-x-generic-symbolic")
+
+            if insert_at != -1:
+                self.nb.insert_page(self.images_tab, tab_label, insert_at)
+            else:
+                self.nb.append_page(self.images_tab, tab_label)
+
+            self.nb.show_all()
+
+            if focus:
+                idx = self.nb.page_num(self.images_tab)
+                if idx != -1:
+                    self.nb.set_current_page(idx)
+        except Exception as e:
+            self.message("Erreur", f"Impossible de reconstruire l\'onglet Images:\n{e}")
+
+    def refresh_toggle_label(self):
+        self.btn_toggle.set_label("Désactiver" if is_timer_active() else "Activer")
+
+    def message(self, title, text):
+        dlg = Gtk.MessageDialog(self, 0, Gtk.MessageType.INFO, Gtk.ButtonsType.OK, title)
+        dlg.format_secondary_text(text)
+        dlg.set_default_size(860, 480)
+        dlg.run()
+        dlg.destroy()
+
+    def on_toggle_image_enabled(self, widget, *args):
+        """Instant-save: enable/disable one meteo image.
+
+        Compatible with:
+          - Gtk.Switch notify::active -> (switch, pspec, rel_path)
+          - Gtk.CheckButton toggled   -> (checkbutton, rel_path)
+        """
+        try:
+            rel_path = None
+            if len(args) == 1:
+                rel_path = args[0]
+            elif len(args) >= 2:
+                rel_path = args[1]
+            if not rel_path:
+                return
+
+            active = bool(widget.get_active()) if hasattr(widget, "get_active") else True
+
+            self.cfg.setdefault("enabled_images", {})
+            self.cfg["enabled_images"][rel_path] = active
+            save_cfg(self.cfg)
+
+            # refresh preview (chips + state)
+            self.refresh_images_preview()
+        except Exception as e:
+            self.message("Erreur", f"Impossible d\'enregistrer l\'état:\n{e}")
+
+    def on_create_placeholders(self, _btn):
+        try:
+            script = Path.home() / ".local" / "bin" / "wallpaper-smart-mkplaceholders.sh"
+            if not script.exists():
+                self.message(
+                    "Script manquant",
+                    f"Le script n'existe pas:\n{script}\n\n"
+                    "Crée-le puis rends-le exécutable:\n"
+                    "chmod +x ~/.local/bin/wallpaper-smart-mkplaceholders.sh"
+                )
+                return
+
+            p = subprocess.run(
+                [str(script)],
+                text=True,
+                capture_output=True,
+                env={**os.environ, "CONFIG_FILE": str(CFG_PATH)},
+            )
+
+            out = (p.stdout + "\n" + p.stderr).strip()
+            if p.returncode != 0:
+                self.message("Erreur placeholders", out or "(aucune sortie)")
+                return
+
+            self.refresh_images_preview()
+            self.message("OK", "Placeholders créés (sans écraser les fichiers existants).")
+        except Exception as e:
+            self.message("Erreur", str(e))
+
+    
+    def refresh_geoloc_controls(self):
+        """Enable/disable geoloc inputs depending on selected mode / preset."""
+        mode = self.geo_combo.get_active_text() if hasattr(self, "geo_combo") else "auto_ip"
+
+        preset_id = self.preset_combo.get_active_id() if hasattr(self, "preset_combo") else "none"
+        preset_active = bool(preset_id and preset_id != "none")
+
+        # If preset is active, the UI behaves like fixed, but fields are "driven" by the preset.
+        effective_mode = "fixed" if preset_active else mode
+
+        if hasattr(self, "lat_entry"):
+            self.lat_entry.set_sensitive(effective_mode == "fixed" and not preset_active)
+        if hasattr(self, "lon_entry"):
+            self.lon_entry.set_sensitive(effective_mode == "fixed" and not preset_active)
+
+        if hasattr(self, "city_entry"):
+            # City is only editable in 'city' mode, and not editable when preset is active.
+            self.city_entry.set_sensitive(mode == "city" and not preset_active)
+    
+    def _fill_from_auto_ip(self):
+        """Remplit Lat/Lon/Ville depuis l'IP (UI uniquement, sans sauvegarde)."""
+        try:
+            
+            self.city_entry.set_text("")
+
+            d = _auto_ip_details()
+            logging.debug(f"Auto IP geoloc Lat: {d['lat']}")
+            logging.debug(f"Auto IP geoloc Lon: {d['lon']}")
+            
+            if "lat" in d and hasattr(self, "lat_entry"):
+                self.lat_entry.set_text(f"{d['lat']:.4f}")
+            if "lon" in d and hasattr(self, "lon_entry"):
+                self.lon_entry.set_text(f"{d['lon']:.4f}")
+            
+            if hasattr(self, "city_entry"):
+                city = str(d.get("city") or "").strip()
+                region = str(d.get("region") or "").strip()
+                country = str(d.get("country") or "").strip()
+                label = city
+                if region and region not in label:
+                    label = (label + f", {region}") if label else region
+                if country and country not in label:
+                    label = (label + f", {country}") if label else country
+                if label:
+                    self.city_entry.set_text(label)
+        except Exception:
+            pass
+
+    def on_geo_mode_changed(self, _combo):
+        """When user changes mode, adjust UI and preset."""
+        # If user leaves fixed mode, reset preset to none (ergonomic)
+        mode = self.geo_combo.get_active_text()
+        if mode != "fixed" and hasattr(self, "preset_combo"):
+            # block preset change handler while updating
+            self.preset_combo.set_active_id("none")
+        if mode == "auto_ip":
+            self._fill_from_auto_ip()
+
+        self.refresh_geoloc_controls()
+
+    def on_geo_preset_changed(self, _combo):
+        """Apply preset instantly in the UI (save only on Enregistrer)."""
+        preset_id = self.preset_combo.get_active_id() if hasattr(self, "preset_combo") else "none"
+        if not preset_id:
+            preset_id = "none"
+
+        if preset_id != "none":
+            label, coords = GEO_PRESETS.get(preset_id, ("", None))
+            if coords:
+                lat, lon = coords
+
+                # Fill entries (UI only)
+                self.lat_entry.set_text(f"{lat:.4f}")
+                self.lon_entry.set_text(f"{lon:.4f}")
+
+                # Update City field to match preset label (UI only)
+                if hasattr(self, "city_entry"):
+                    # Keep it "clean" (optional): remove flag emojis if present
+                    pretty = label
+                    for flag in ["🇷🇺", "🇺🇸", "🇮🇸", "🇸🇬", "🇦🇪", "🇯🇵", "🇦🇺", "🇲🇦"]:
+                        pretty = pretty.replace(flag, "")
+                    pretty = pretty.strip()
+                    self.city_entry.set_text(pretty)
+
+                # Force mode fixed in UI
+                self.geo_combo.set_active(["auto_ip", "fixed", "city"].index("fixed"))
+
+        self.refresh_geoloc_controls()
+
+    def on_choose_folder(self, _btn):
+        dlg = Gtk.FileChooserDialog(
+            title="Choisir le dossier wallpapers",
+            parent=self,
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+        )
+        dlg.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+        cur = Path(self.folder_entry.get_text().strip())
+        if cur.exists():
+            dlg.set_current_folder(str(cur))
+
+        if dlg.run() == Gtk.ResponseType.OK:
+            self.folder_entry.set_text(dlg.get_filename())
+            self.wallpaper_themes = load_wallpaper_themes(self.folder_entry.get_text().strip())
+            self._refresh_theme_combo_items()
+            self.refresh_images_preview()
+        dlg.destroy()
+
+    def on_open_folder(self, _btn):
+        folder = self.folder_entry.get_text().strip()
+        if folder:
+            run(["xdg-open", folder])
+
+    def _open_subdir(self, name: str, themed: bool = False):
+        root = Path(self.folder_entry.get_text().strip())
+
+        if themed:
+            p = self._theme_dir(root) / name
+        else:
+            p = root / name
+
+        p.mkdir(parents=True, exist_ok=True)
+        run(["xdg-open", str(p)])
+
+    def on_pick_image(self, _btn, rel_path):
+        root = Path(self.folder_entry.get_text().strip())
+        chosen = pick_file(self, f"Choisir {rel_path}", root)
+        if not chosen:
+            return
+        src = Path(chosen)
+        dst = root / rel_path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(src.read_bytes())
+        self.refresh_images_preview()
+
+
+    def refresh_images_preview(self):
+        root = Path(self.folder_entry.get_text().strip())
+        enabled_map = self.cfg.get("enabled_images", {})
+
+        # --- Base previews (left) ---
+        moment_now = None
+        try:
+            moment_now = self._compute_current_moment_key()
+        except Exception:
+            moment_now = None
+
+        if getattr(self, "base_rows", None):
+            for moment_key, (_row, img_widget, path_lbl, chip_lbl, current_chip) in self.base_rows.items():
+                rel = self._rel_path("base", f"{moment_key}.png")
+                p = root / rel 
+                exists = p.exists()
+
+                path_lbl.set_text(str(p) if exists else f"{p} (manquant)")
+                pb = load_pixbuf_scaled(p) if exists else None
+                if pb:
+                    img_widget.set_from_pixbuf(pb)
+                else:
+                    img_widget.clear()
+
+                ctx = chip_lbl.get_style_context()
+                ctx.remove_class("chip-ok")
+                ctx.remove_class("chip-miss")
+                if exists:
+                    chip_lbl.set_text("OK")
+                    ctx.add_class("chip-ok")
+                else:
+                    chip_lbl.set_text("MANQUANT")
+                    ctx.add_class("chip-miss")
+
+                if current_chip is not None:
+                    if moment_now and moment_key == moment_now:
+                        current_chip.show()
+                    else:
+                        current_chip.hide()
+
+        # --- Meteo previews (right) ---
+        for rel, (img_widget, path_lbl, chip_lbl, active_sw) in getattr(self, "image_widgets", {}).items():
+            p = root / rel
+            exists = p.exists()
+
+            enabled = bool(enabled_map.get(rel, True))
+            hid = getattr(active_sw, "_hid_active", None)
+            if hid is not None:
+                active_sw.handler_block(hid)
+            active_sw.set_active(enabled)
+            if hid is not None:
+                active_sw.handler_unblock(hid)
+
+            path_lbl.set_text(str(p) if exists else f"{p} (manquant)")
+            pb = load_pixbuf_scaled(p) if exists else None
+            if pb:
+                img_widget.set_from_pixbuf(pb)
+            else:
+                img_widget.clear()
+
+            ctx = chip_lbl.get_style_context()
+            ctx.remove_class("chip-ok")
+            ctx.remove_class("chip-miss")
+            if exists:
+                chip_lbl.set_text("OK")
+                ctx.add_class("chip-ok")
+            else:
+                chip_lbl.set_text("MANQUANT")
+                ctx.add_class("chip-miss")
+
+        # Re-apply filter after refresh
+        moment = getattr(self, "images_selected_moment", None) or None
+        if not moment:
+            moment = moment_now
+        if moment:
+            self.images_selected_moment = moment
+            self.apply_meteo_filter(moment)
+
+
+    def on_save(self, _btn):
+        # self.on_test(_btn)  # test first to validate inputs
+        current_page = self.nb.get_current_page()
+        current_widget = self.nb.get_nth_page(current_page)
+        try:
+            cfg = self.cfg
+
+            cfg["wallpaper_dir"] = self.folder_entry.get_text().strip()
+            # Wallpaper theme
+            if hasattr(self, "wall_theme_combo"):
+                theme_id = self.wall_theme_combo.get_active_id() or "default"
+            else:
+                theme_id = cfg.get("wallpaper_theme", "default")
+            
+            themes = load_wallpaper_themes(cfg["wallpaper_dir"])
+            valid_ids = [k for k, _ in themes]
+            if theme_id not in valid_ids:
+                theme_id = valid_ids[0]
+            cfg["wallpaper_theme"] = theme_id
+
+            cfg["timer_minutes"] = int(self.spin_minutes.get_value())
+
+            cfg["schedule"] = {
+                "nuit_start": int(self.spin_nuit.get_value()),
+                "aube_start": int(self.spin_aube.get_value()),
+                "midi_start": int(self.spin_midi.get_value()),
+                "coucher_start": int(self.spin_coucher.get_value()),
+            }
+
+            cfg["geolocation"]["mode"] = self.geo_combo.get_active_text()
+            cfg["geolocation"]["fixed"]["lat"] = float(self.lat_entry.get_text().strip())
+            cfg["geolocation"]["fixed"]["lon"] = float(self.lon_entry.get_text().strip())
+            cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
+
+            # Preset (simulation) - appliqué au save
+            if hasattr(self, "preset_combo"):
+                preset_id = self.preset_combo.get_active_id() or "none"
+            else:
+                preset_id = cfg.get("geolocation", {}).get("preset", "none")
+            cfg["geolocation"]["preset"] = preset_id
+
+            
+            if preset_id != "none" and preset_id in GEO_PRESETS and GEO_PRESETS[preset_id][1]:
+                lat, lon = GEO_PRESETS[preset_id][1]
+                cfg["geolocation"]["mode"] = "fixed"
+                cfg["geolocation"]["fixed"]["lat"] = float(lat)
+                cfg["geolocation"]["fixed"]["lon"] = float(lon)
+
+            for k in WEATHER_KEYS_ORDER:
+                cfg["weather_mapping"][k] = self.map_entries[k].get_text().strip()
+
+            cfg.setdefault("enabled_images", {})
+
+            migrate_enabled_images(cfg)
+            save_cfg(cfg)
+            ensure_overrides(cfg)
+
+            root = Path(cfg["wallpaper_dir"])
+            theme = (cfg.get("wallpaper_theme") or "default").strip() or "default"
+            (root / "templates" / theme / "base").mkdir(parents=True, exist_ok=True)
+            (root / "templates" / theme / "meteo").mkdir(parents=True, exist_ok=True)
+
+            # rebuild Images tab (mapping dynamic)
+            self.rebuild_images_tab(focus=False)
+            idx_back = self.nb.page_num(current_widget)
+            if idx_back != -1:
+                self.nb.set_current_page(idx_back)
+
+            self.message("OK", "Config enregistrée + systemd rechargé.")
+            self.refresh_toggle_label()
+        except Exception as e:
+            self.message("Erreur", str(e))
+
+    def on_test(self, _btn):
+        try:
+            # 1) Construire une config temporaire depuis l'UI (sans sauvegarder la vraie)
+            cfg = json.loads(json.dumps(self.cfg))  # copie safe
+
+            # Wallpaper dir
+            if hasattr(self, "folder_entry"):
+                cfg["wallpaper_dir"] = self.folder_entry.get_text().strip()
+
+            # Timer
+            if hasattr(self, "spin_minutes"):
+                cfg["timer_minutes"] = int(self.spin_minutes.get_value())
+
+            # Schedule
+            if hasattr(self, "spin_nuit"):
+                cfg["schedule"] = {
+                    "nuit_start": int(self.spin_nuit.get_value()),
+                    "aube_start": int(self.spin_aube.get_value()),
+                    "midi_start": int(self.spin_midi.get_value()),
+                    "coucher_start": int(self.spin_coucher.get_value()),
+                }
+
+            # Geoloc (mode + lat/lon + city + preset)
+            cfg.setdefault("geolocation", {})
+            if hasattr(self, "geo_combo"):
+                cfg["geolocation"]["mode"] = self.geo_combo.get_active_text()
+
+            if hasattr(self, "lat_entry") and hasattr(self, "lon_entry"):
+                try:
+                    cfg["geolocation"].setdefault("fixed", {})
+                    cfg["geolocation"]["fixed"]["lat"] = float(self.lat_entry.get_text().strip())
+                    cfg["geolocation"]["fixed"]["lon"] = float(self.lon_entry.get_text().strip())
+                except Exception:
+                    pass
+
+            if hasattr(self, "city_entry"):
+                cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
+
+            if hasattr(self, "preset_combo"):
+                # value stored in combo id
+                preset_id = self.preset_combo.get_active_id() or "none"
+                cfg["geolocation"]["preset"] = preset_id
+
+            # Mapping
+            if hasattr(self, "map_entries"):
+                cfg.setdefault("weather_mapping", {})
+                for k, e in self.map_entries.items():
+                    cfg["weather_mapping"][k] = e.get_text().strip()
+
+            # enabled_images
+            cfg.setdefault("enabled_images", self.cfg.get("enabled_images", {}))
+
+            # 2) Ecrire config temporaire
+            tmp = APP_DIR / "config.test.json"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=2, ensure_ascii=False)
+
+            # 3) Lancer wallpaper-smart.sh avec la config temporaire
+            script = Path.home() / ".local/bin/wallpaper-smart.sh"
+            p = subprocess.run(
+                [str(script)],
+                text=True,
+                capture_output=True,
+                env={**os.environ, "CONFIG_FILE": str(tmp)},
+            )
+
+            out = (p.stdout + "\n" + p.stderr).strip()
+            self.message("Résultat test", out or "(aucune sortie)")
+        except Exception as e:
+            self.message("Erreur test", str(e))
+
+
+    def on_logs(self, _btn):
+        try:
+            p = run(["journalctl", "--user", "-u", SERVICE, "-n", "10", "--no-pager"])
+            self.message("Logs (10 dernières lignes)", p.stdout.strip() or "(vide)")
+        except Exception as e:
+            self.message("Erreur logs", str(e))
+
+    def on_toggle_timer(self, _btn):
+        try:
+            set_timer(not is_timer_active())
+            self.refresh_toggle_label()
+            self.refresh_dashboard()
+        except Exception as e:
+            self.message("Erreur timer", str(e))
+
+
+def main():
+    win = App()
+    win.connect("destroy", Gtk.main_quit)
+    win.show_all()
+    Gtk.main()
+
+if __name__ == "__main__":
+    main()
+
+
+

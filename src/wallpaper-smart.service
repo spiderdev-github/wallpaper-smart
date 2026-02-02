@@ -1,0 +1,8 @@
+# wallpaper-smart.service
+[Unit]
+Description=Smart wallpaper updater (time + weather)
+
+[Service]
+Type=oneshot
+# WALLDIR sera fourni par un override ou par l'environnement utilisateur
+ExecStart=%h/.local/bin/wallpaper-smart.sh
