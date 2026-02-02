@@ -911,7 +911,6 @@ def make_card(title: str, content: Gtk.Widget):
 
 
 # ---------------- UI ----------------
-
 class App(Gtk.Window):
     def __init__(self):
         super().__init__(title="Wallpaper Smart – Paramètres")
@@ -971,9 +970,9 @@ class App(Gtk.Window):
         root.pack_start(self.nb, True, True, 0)
 
         self.nb.append_page(self.build_tab_general(), make_tab_label("Général", "preferences-system-symbolic"))
-        self.nb.append_page(self.build_tab_time(),    make_tab_label("Time",    "alarm-symbolic"))
+        self.nb.append_page(self.build_tab_time(),    make_tab_label("Planning",    "alarm-symbolic"))
         
-        self.nb.append_page(self.build_tab_geoloc(),  make_tab_label("Géoloc",   "mark-location-symbolic"))
+        self.nb.append_page(self.build_tab_geoloc(),  make_tab_label("Localisation",   "mark-location-symbolic"))
         self.refresh_preset_icons_async()
 
         self.nb.append_page(self.build_tab_mapping(), make_tab_label("Mapping", "view-list-symbolic"))
@@ -1011,6 +1010,28 @@ class App(Gtk.Window):
 
         # Then every 10 minutes (avoid hammering API)
         GLib.timeout_add_seconds(600, self._timer_refresh_preset_icons)
+
+    def _select_preset_in_combo_from_cfg(self):
+        # No accents in comments
+        print('==> _select_preset_in_combo_from_cfg');
+        try:
+            preset_id = self.cfg.get("geolocation", {}).get("preset", "none")
+            if not preset_id or preset_id == "none":
+                self.preset_combo.set_active(-1)
+                return
+
+            model = self.preset_combo.get_model()
+            it = model.get_iter_first()
+            while it:
+                if model[it][0] == preset_id:
+                    self.preset_combo.set_active_iter(it)
+                    return
+                it = model.iter_next(it)
+            
+            self.preset_combo.set_active(-1)
+        except Exception:
+            pass
+
 
     def _update_preset_icon_row(self, treeiter, emoji: str):
         # Must run in GTK main thread
@@ -1318,10 +1339,30 @@ class App(Gtk.Window):
             preset = geo.get("preset", "none")
             fixed = geo.get("fixed", {})
             city = geo.get("city_name", "")
+            
+            it = None
+            try:
+                it = self.preset_combo.get_active_iter()
+            except Exception:
+                it = None
 
-            if preset and preset != "none" and preset in GEO_PRESETS:
-                label, coords = GEO_PRESETS[preset]
-                self.dash_loc.set_text(f"Preset: {label} ({coords[0]:.4f}, {coords[1]:.4f})")
+
+            if it is None:
+                preset_id = "none"
+            else:
+                preset_id = self.preset_store[it][0]
+
+            if not preset_id:
+                preset_id = "none"
+
+            if preset_id != "none":
+                mode = "preset"
+                lat = float(self.preset_store[it][3])
+                lon = float(self.preset_store[it][4])
+                label = str(self.preset_store[it][1])
+                
+            if mode == "preset":
+                self.dash_loc.set_text(f"Preset: {label} ({lat:.4f}, {lon:.4f})")
             elif mode == "fixed":
                 self.dash_loc.set_text(f"Manuel: {fixed.get('lat', '—')}, {fixed.get('lon', '—')}")
             elif mode == "city":
@@ -1534,7 +1575,17 @@ class App(Gtk.Window):
         else:
             self.preset_combo.set_active_iter(self.preset_store.get_iter_first())
 
-        self.preset_combo.connect("changed", self.on_geo_preset_changed)
+        # Select current preset from cfg
+        self._select_preset_in_combo_from_cfg()
+
+        hid = self.preset_combo.connect("changed", self.on_geo_preset_changed)
+
+        # block signal while selecting preset from cfg
+        self.preset_combo.handler_block(hid)
+        self._select_preset_in_combo_from_cfg()
+        self.preset_combo.handler_unblock(hid)
+
+        self.preset_store.append(["none", "Aucun preset", "", 0.0, 0.0])
 
         content.pack_start(preset_lbl, False, False, 0)
         content.pack_start(self.preset_combo, False, False, 0)
@@ -1568,6 +1619,7 @@ class App(Gtk.Window):
         self.refresh_geoloc_controls()
 
         box.pack_start(make_card("Geolocalisation", content), False, False, 0)
+        self.refresh_dashboard()
         return make_page(box)
 
 
@@ -2051,7 +2103,7 @@ class App(Gtk.Window):
 
         if hasattr(self, "city_entry"):
             # City is only editable in 'city' mode, and not editable when preset is active.
-            self.city_entry.set_sensitive(mode == "city" and not preset_active)
+            self.city_entry.set_sensitive(mode == "city" or mode == 'fixed' and not preset_active)
     
     def _fill_from_auto_ip(self):
         """Remplit Lat/Lon/Ville depuis l'IP (UI uniquement, sans sauvegarde)."""
@@ -2132,6 +2184,11 @@ class App(Gtk.Window):
             self.geo_combo.set_active(["auto_ip", "fixed", "city"].index("fixed"))
 
         self.refresh_geoloc_controls()
+
+        # Save preset instantly
+        self.cfg.setdefault("geolocation", {})
+        self.cfg["geolocation"]["preset"] = preset_id
+        save_cfg(self.cfg)
 
 
     def on_choose_folder(self, _btn):
@@ -2293,19 +2350,51 @@ class App(Gtk.Window):
             cfg["geolocation"]["fixed"]["lon"] = float(self.lon_entry.get_text().strip())
             cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
 
-            # Preset (simulation) - appliqué au save
-            if hasattr(self, "preset_combo"):
-                preset_id = self.preset_combo.get_active_id() or "none"
-            else:
-                preset_id = cfg.get("geolocation", {}).get("preset", "none")
-            cfg["geolocation"]["preset"] = preset_id
 
             
+
+            preset_id = "none"
+            it = None
+            try:
+                it = self.preset_combo.get_active_iter()
+            except Exception:
+                it = None
+
+            if it is None:
+                preset_id = "none"
+            else:
+                preset_id = self.preset_store[it][0]
+
+            if not preset_id:
+                preset_id = "none"
+
             if preset_id != "none" and preset_id in GEO_PRESETS and GEO_PRESETS[preset_id][1]:
-                lat, lon = GEO_PRESETS[preset_id][1]
+                lat = float(self.preset_store[it][3])
+                lon = float(self.preset_store[it][4])
+                label = str(self.preset_store[it][1])
                 cfg["geolocation"]["mode"] = "fixed"
-                cfg["geolocation"]["fixed"]["lat"] = float(lat)
-                cfg["geolocation"]["fixed"]["lon"] = float(lon)
+                cfg["geolocation"]["fixed"]["lat"] = lat
+                cfg["geolocation"]["fixed"]["lon"] = lon
+                cfg["geolocation"]["city_name"] = label
+                cfg["geolocation"]["preset"] = preset_id
+
+                # Clean city field (remove flag + meteo icon at end if any)
+                pretty = label
+                for flag in ["🇷🇺","🇺🇸","🇮🇸","🇸🇬","🇦🇪","🇯🇵","🇦🇺","🇲🇦","🇫🇷","🇩🇪","🇪🇸","🇮🇹","🇬🇧","🇨🇦","🇧🇷","🇲🇽","🇿🇦","🇮🇳","🇨🇳"]:
+                    pretty = pretty.replace(flag, "")
+                pretty = pretty.strip()
+
+                cfg["geolocation"]["city_name"] = pretty
+                cfg["geolocation"]["preset"] = preset_id
+
+
+            self.refresh_geoloc_controls()
+
+
+            
+            save_cfg(self.cfg)
+            
+            
 
             for k in WEATHER_KEYS_ORDER:
                 cfg["weather_mapping"][k] = self.map_entries[k].get_text().strip()
@@ -2329,6 +2418,7 @@ class App(Gtk.Window):
 
             self.message("OK", "Config enregistrée + systemd rechargé.")
             self.refresh_toggle_label()
+            self.refresh_dashboard()
         except Exception as e:
             self.message("Erreur", str(e))
 
