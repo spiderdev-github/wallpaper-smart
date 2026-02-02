@@ -22,7 +22,34 @@ need_cmd() {
 
 need_cmd curl
 need_cmd jq
-need_cmd gsettings
+
+# -----------------------------
+# Desktop detection
+# -----------------------------
+DESKTOP="${XDG_CURRENT_DESKTOP:-}"
+DESKTOP="${DESKTOP,,}"  # lowercase
+
+# -----------------------------
+# KDE wallpaper setter
+# -----------------------------
+set_wallpaper_kde() {
+  local file="$1"
+
+  command -v qdbus >/dev/null 2>&1 || {
+    log "ERREUR: qdbus manquant (installe: sudo apt install qdbus-qt5)"
+    return 1
+  }
+
+  qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
+var allDesktops = desktops();
+for (i=0; i<allDesktops.length; i++) {
+  d = allDesktops[i];
+  d.wallpaperPlugin = 'org.kde.image';
+  d.currentConfigGroup = Array('Wallpaper','org.kde.image','General');
+  d.writeConfig('Image', 'file://$file');
+}
+"
+}
 
 # -----------------------------
 # Lire config (safe)
@@ -39,7 +66,6 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 [[ -z "$WALL_THEME" || "$WALL_THEME" == "null" ]] && WALL_THEME="default"
 
-
 TEMPLATEDIR="$WALLDIR/templates/$WALL_THEME"
 
 BASEDIR="$TEMPLATEDIR/base"
@@ -47,7 +73,6 @@ METEODIR="$TEMPLATEDIR/meteo"
 TARGET="$WALLDIR/current.png"
 
 mkdir -p "$BASEDIR" "$METEODIR"
-
 
 # Schedule defaults
 NUIT_START=19
@@ -65,16 +90,10 @@ fi
 # -----------------------------
 # enabled_images : true par défaut
 # -----------------------------
-# -----------------------------
-# enabled_images : true par défaut
-# -----------------------------
 is_enabled_image() {
-  local rel="$1"  # ex: meteo/pluie_aube.png
+  local rel="$1"  # ex: templates/default/meteo/pluie_aube.png
   [[ -f "$CONFIG_FILE" ]] || return 0
 
-  # IMPORTANT:
-  # jq 'a // b' retourne b si a est null *ou false*.
-  # Or ici, false signifie "désactivé" → on doit le respecter.
   local v
   v="$(jq -r --arg rel "$rel" '
       if (.enabled_images | type == "object") and (.enabled_images | has($rel)) then
@@ -126,7 +145,6 @@ geoloc_fixed() {
 }
 
 geoloc_city() {
-  # Nominatim: usage modéré (config, pas polling)
   local q url res
   q="$(printf '%s' "$CITY_NAME" | jq -sRr @uri)"
   url="https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1"
@@ -155,7 +173,6 @@ CODE="0"
 METEO_RAW="$(curl -fsSL "https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=weather_code" 2>/dev/null || true)"
 CODE="$(echo "$METEO_RAW" | jq -r '.current.weather_code // 0' 2>/dev/null || echo 0)"
 
-# Classifier Open-Meteo -> bucket
 WEATHER_BUCKET="clear"
 case "$CODE" in
   0) WEATHER_BUCKET="clear" ;;
@@ -167,7 +184,6 @@ case "$CODE" in
   *) WEATHER_BUCKET="clear" ;;
 esac
 
-# Mapping bucket -> prefix dossier/fichier
 PREFIX="clair"
 if [[ -f "$CONFIG_FILE" ]]; then
   PREFIX="$(jq -r --arg k "$WEATHER_BUCKET" '.weather_mapping[$k] // "clair"' "$CONFIG_FILE" 2>/dev/null || echo "clair")"
@@ -180,24 +196,12 @@ fi
 HOUR="$(date +%H)"
 HOUR=$((10#$HOUR))
 
-# Assumptions:
-# - Les "start" indiquent à partir de quelle heure commence le segment.
-# - Le segment "nuit" est celui qui est avant aube_start.
-# - Ordre attendu: nuit_start > coucher_start ou inverse selon tes choix => on calcule via plages simples.
-#
-# On va faire simple et robuste:
-# - aube:   [aube_start, midi_start)
-# - midi:   [midi_start, coucher_start)
-# - coucher:[coucher_start, nuit_start) si coucher_start < nuit_start
-# - nuit:   le reste
 MOMENT="nuit"
-
 if (( HOUR >= AUBE_START && HOUR < MIDI_START )); then
   MOMENT="aube"
 elif (( HOUR >= MIDI_START && HOUR < COUCHER_START )); then
   MOMENT="midi"
 else
-  # coucher dépend de la position de nuit_start
   if (( COUCHER_START < NUIT_START )); then
     if (( HOUR >= COUCHER_START && HOUR < NUIT_START )); then
       MOMENT="coucher"
@@ -205,8 +209,6 @@ else
       MOMENT="nuit"
     fi
   else
-    # cas où nuit_start est plus petit (ex nuit à 0/1/2h)
-    # coucher: [coucher_start, 24) U [0, nuit_start)
     if (( HOUR >= COUCHER_START || HOUR < NUIT_START )); then
       MOMENT="coucher"
     else
@@ -217,21 +219,17 @@ fi
 
 # -----------------------------
 # Choix image finale
-# priorité: meteo si fichier existe ET activé, sinon base
 # -----------------------------
 REL_METEO="templates/${WALL_THEME}/meteo/${PREFIX}_${MOMENT}.png"
 CANDIDATE="$WALLDIR/$REL_METEO"
 BASE="$BASEDIR/${MOMENT}.png"
-
 
 CHOSEN="$BASE"
 if [[ -f "$CANDIDATE" ]] && is_enabled_image "$REL_METEO"; then
   CHOSEN="$CANDIDATE"
 fi
 
-# Fallback si base absente
 if [[ ! -f "$CHOSEN" ]]; then
-  # si candidate absent/désactivé + base manquante, tente base nuit
   if [[ -f "$BASEDIR/nuit.png" ]]; then
     CHOSEN="$BASEDIR/nuit.png"
   else
@@ -240,13 +238,26 @@ if [[ ! -f "$CHOSEN" ]]; then
   fi
 fi
 
-# Copie dans un fichier stable
 cp -f "$CHOSEN" "$TARGET"
 
-# Appliquer sur GNOME (light + dark)
-if gsettings set org.gnome.desktop.background picture-uri "file://$TARGET" 2>/dev/null; then
-  gsettings set org.gnome.desktop.background picture-uri-dark "file://$TARGET" 2>/dev/null || true
-  log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+# -----------------------------
+# Apply wallpaper GNOME / KDE
+# -----------------------------
+if [[ "$DESKTOP" == *"gnome"* ]]; then
+  if command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.background picture-uri "file://$TARGET" 2>/dev/null; then
+    gsettings set org.gnome.desktop.background picture-uri-dark "file://$TARGET" 2>/dev/null || true
+    log "✅ Wallpaper: $CHOSEN (GNOME | moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+  else
+    log "WARN: gsettings a echoue (GNOME pas pret). Fichier pret: $TARGET"
+  fi
+
+elif [[ "$DESKTOP" == *"kde"* || "$DESKTOP" == *"plasma"* ]]; then
+  if set_wallpaper_kde "$TARGET"; then
+    log "✅ Wallpaper: $CHOSEN (KDE | moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+  else
+    log "WARN: echec KDE. Fichier pret: $TARGET"
+  fi
+
 else
-  warn "gsettings a échoué (session GNOME pas prête). Fichier prêt: $TARGET"
+  log "WARN: Desktop non supporte ($XDG_CURRENT_DESKTOP). Fichier pret: $TARGET"
 fi

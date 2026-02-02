@@ -65,8 +65,9 @@ log "Installing deps..."
 sudo apt update
 sudo apt install -y \
   curl jq \
-  python3-gi python3-gi-cairo gir1.2-gtk-3.0
-
+  python3-gi python3-gi-cairo gir1.2-gtk-3.0 \
+  qdbus-qt5
+  
 # 3) Install scripts (overwrite)
 log "Installing scripts into ~/.local/bin/ ..."
 install -m 755 "$SRC/wallpaper-smart.sh" "$HOME/.local/bin/wallpaper-smart.sh"
