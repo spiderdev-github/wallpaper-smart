@@ -185,7 +185,7 @@ DEFAULT_CFG = {
 # }
 
 GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
-    "none": ("Aucun (mode normal)", None),
+    "none": ("Aucun (saisie perso)", None),
 
     "et_addis_ababa": ("🇪🇹 Addis Abeba", (8.9806, 38.7578)),
     "th_bangkok": ("🇹🇭 Bangkok", (13.7563, 100.5018)),
@@ -355,8 +355,10 @@ def _auto_ip_details() -> Dict[str, str | float]:
         return out
 
     except Exception as e:
-        print(f"[auto_ip_details] ERROR: {e}", flush=True)
-        return {}
+        msg = str(e)
+        print(f"[auto_ip_details] ERROR: {msg}", flush=True)
+        return {"_error": msg}
+
 
     
 def apply_css(dark: bool):
@@ -1039,6 +1041,13 @@ class App(Gtk.Window):
         # Then every 10 minutes (avoid hammering API)
         GLib.timeout_add_seconds(600, self._timer_refresh_preset_icons)
 
+    def on_clear_city(self, _btn):
+        try:
+            self.city_entry.set_text("")
+            self.city_entry.grab_focus()
+        except Exception:
+            pass
+        
     def _select_preset_in_combo_from_cfg(self):
         # No accents in comments
         try:
@@ -1425,7 +1434,7 @@ class App(Gtk.Window):
                 # Geoloc (mode + lat/lon + city + preset)
                 cfg.setdefault("geolocation", {})
                 if hasattr(self, "geo_combo"):
-                    cfg["geolocation"]["mode"] = self.geo_combo.get_active_text()
+                    cfg["geolocation"]["mode"] = self.geo_combo.get_active_id()
 
                 if hasattr(self, "lat_entry") and hasattr(self, "lon_entry"):
                     try:
@@ -1552,7 +1561,17 @@ class App(Gtk.Window):
         cur_mode = self.cfg.get("geolocation", {}).get("mode", "auto_ip")
         if cur_mode not in ["auto_ip", "fixed", "city"]:
             cur_mode = "auto_ip"
-        self.geo_combo.set_active(["auto_ip", "fixed", "city"].index(cur_mode))
+
+        self.geo_combo = Gtk.ComboBoxText()
+        self.geo_combo.append("auto_ip", "Geolocalisation")
+        self.geo_combo.append("fixed", "Fixe")
+        self.geo_combo.append("city", "Ville")
+
+        current_mode = self.cfg.get("geolocation", {}).get("mode", "auto_ip")
+        if current_mode not in ["auto_ip", "fixed", "city"]:
+            current_mode = "auto_ip"
+
+        self.geo_combo.set_active_id(current_mode)
 
         mode_lbl = Gtk.Label(label="Mode", xalign=0)
         mode_lbl.get_style_context().add_class("muted")
@@ -1568,7 +1587,7 @@ class App(Gtk.Window):
         self.preset_store = Gtk.ListStore(str, str, str, float, float)
 
         # Optional: add a "none" row
-        self.preset_store.append(["none", "Aucun (mode normal)", "", 0.0, 0.0])
+        self.preset_store.append(["none", "Aucun (saisie perso)", "", 0.0, 0.0])
 
         for pid, (label, coords) in GEO_PRESETS.items():
             if pid == "none" or not coords:
@@ -1605,16 +1624,25 @@ class App(Gtk.Window):
         # Select current preset from cfg
         self._select_preset_in_combo_from_cfg()
 
-        hid = self.preset_combo.connect("changed", self.on_geo_preset_changed)
+        #hid = self.preset_combo.connect("changed", self.on_geo_preset_changed)
+        self._hid_preset_changed = self.preset_combo.connect("changed", self.on_geo_preset_changed)
 
         # block signal while selecting preset from cfg
-        self.preset_combo.handler_block(hid)
+        self.preset_combo.handler_block(self._hid_preset_changed)
         self._select_preset_in_combo_from_cfg()
-        self.preset_combo.handler_unblock(hid)
+        self.preset_combo.handler_unblock(self._hid_preset_changed)
 
         
         content.pack_start(preset_lbl, False, False, 0)
         content.pack_start(self.preset_combo, False, False, 0)
+        if cur_mode == "auto_ip":
+            if hasattr(self, "_hid_preset_changed"):
+                self.preset_combo.handler_block(self._hid_preset_changed)
+
+            self.preset_combo.set_active(-1)  # solution 2: no selection
+
+            if hasattr(self, "_hid_preset_changed"):
+                self.preset_combo.handler_unblock(self._hid_preset_changed)
 
         fixed = self.cfg.get("geolocation", {}).get("fixed", {"lat": 48.5839, "lon": 7.7455})
         self.lat_entry = Gtk.Entry()
@@ -1625,17 +1653,31 @@ class App(Gtk.Window):
         self.city_entry.set_text(self.cfg.get("geolocation", {}).get("city_name", "Strasbourg"))
 
         g = Gtk.Grid(column_spacing=10, row_spacing=8)
-        g.attach(Gtk.Label(label="Lat", xalign=0), 0, 0, 1, 1)
+        g.attach(Gtk.Label(label="Latitude", xalign=0), 0, 0, 1, 1)
         g.attach(self.lat_entry, 1, 0, 1, 1)
-        g.attach(Gtk.Label(label="Lon", xalign=0), 0, 1, 1, 1)
+        g.attach(Gtk.Label(label="Longitude", xalign=0), 0, 1, 1, 1)
         g.attach(self.lon_entry, 1, 1, 1, 1)
+
         g.attach(Gtk.Label(label="Ville", xalign=0), 0, 2, 1, 1)
-        g.attach(self.city_entry, 1, 2, 1, 1)
+
+        city_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        city_row.set_hexpand(True)
+
+        self.city_entry.set_hexpand(True)
+        city_row.pack_start(self.city_entry, True, True, 0)
+
+        self.btn_city_clear = Gtk.Button(label="✕")
+        self.btn_city_clear.set_size_request(36, -1)
+        self.btn_city_clear.connect("clicked", self.on_clear_city)
+        city_row.pack_start(self.btn_city_clear, False, False, 0)
+
+        g.attach(city_row, 1, 2, 1, 1)
+
 
         content.pack_start(g, False, False, 0)
 
         hint = Gtk.Label(
-            label="Astuce: 'city' utilise OpenStreetMap (Nominatim). A utiliser pour config, pas en polling intensif.",
+            label="Astuce: la géolocalisation utilise OpenStreetMap (Nominatim). A utiliser pour config, pas en polling intensif.",
             xalign=0
         )
         hint.set_line_wrap(True)
@@ -2260,34 +2302,112 @@ class App(Gtk.Window):
 
     
     def refresh_geoloc_controls(self):
-        """Enable/disable geoloc inputs depending on selected mode / preset."""
-        mode = self.geo_combo.get_active_text() if hasattr(self, "geo_combo") else "auto_ip"
+        mode = self.geo_combo.get_active_id() if hasattr(self, "geo_combo") else "auto_ip"
 
-        preset_id = self.preset_combo.get_active_id() if hasattr(self, "preset_combo") else "none"
+
+        preset_id = "none"
+        it = None
+
+        try:
+            it = self.preset_combo.get_active_iter()
+        except Exception:
+            it = None
+
+        if it is None:
+            preset_id = "none"
+        else:
+            preset_id = self.preset_store[it][0]
+
         preset_active = bool(preset_id and preset_id != "none")
+        if mode == "fixed":
+            if preset_active:
+                if hasattr(self, "lat_entry"):
+                    self.lat_entry.set_sensitive(False)
+                if hasattr(self, "lon_entry"):
+                    self.lon_entry.set_sensitive(False)
+                if hasattr(self, "city_entry"):
+                    self.city_entry.set_sensitive(False)
+                self.btn_city_clear.set_sensitive(False)
+            else:
+                if hasattr(self, "lat_entry"):
+                    self.lat_entry.set_sensitive(True)
+                if hasattr(self, "lon_entry"):
+                    self.lon_entry.set_sensitive(True)
+                if hasattr(self, "city_entry"):
+                    self.city_entry.set_sensitive(True)
 
-        # If preset is active, the UI behaves like fixed, but fields are "driven" by the preset.
-        effective_mode = "fixed" if preset_active else mode
+                self.btn_city_clear.set_sensitive(True)
+                
+                self.city_entry.set_text("")
+                self.lat_entry.set_text("")
+                self.lon_entry.set_text("")
+        elif mode == "city":
+            if hasattr(self, "lat_entry"):
+                self.lat_entry.set_sensitive(False)
+            if hasattr(self, "lon_entry"):
+                self.lon_entry.set_sensitive(False)
+            if hasattr(self, "city_entry"):
+                self.city_entry.set_sensitive(True)
+            
+            self.preset_combo.set_active(0)  # solution 2: no selection
+            self.lon_entry.set_text("")
+            self.lat_entry.set_text("")
+            self.city_entry.set_text("")
+            self.btn_city_clear.set_sensitive(True)
+        else:
+            # auto_ip
+            if hasattr(self, "lat_entry"):
+                self.lat_entry.set_sensitive(False)
+            if hasattr(self, "lon_entry"):
+                self.lon_entry.set_sensitive(False)
+            if hasattr(self, "city_entry"):
+                self.city_entry.set_sensitive(False)
+            self.btn_city_clear.set_sensitive(False)
 
-        if hasattr(self, "lat_entry"):
-            self.lat_entry.set_sensitive(effective_mode == "fixed" and not preset_active)
-        if hasattr(self, "lon_entry"):
-            self.lon_entry.set_sensitive(effective_mode == "fixed" and not preset_active)
+        # Optionnel: bouton clear ville
+        #if hasattr(self, "btn_city_clear"):
+        #    self.btn_city_clear.set_sensitive((mode == "city") or (preset_active and preset_id == "none"))
 
-        if hasattr(self, "city_entry"):
-            # City is only editable in 'city' mode, and not editable when preset is active.
-            self.city_entry.set_sensitive(mode == "city" or mode == 'fixed' and not preset_active)
-    
+
+
     def _fill_from_auto_ip(self):
         """Remplit Lat/Lon/Ville depuis l'IP (UI uniquement, sans sauvegarde)."""
         try:
-            
+            self.lat_entry.set_text("")
+            self.lon_entry.set_text("")
             self.city_entry.set_text("")
 
+            if hasattr(self, "_hid_preset_changed"):
+                self.preset_combo.handler_block(self._hid_preset_changed)
+
+            self.preset_combo.set_active(0)  # solution 2: no selection
+
+            if hasattr(self, "_hid_preset_changed"):
+                self.preset_combo.handler_unblock(self._hid_preset_changed)
+
             d = _auto_ip_details()
-            logging.debug(f"Auto IP geoloc Lat: {d['lat']}")
-            logging.debug(f"Auto IP geoloc Lon: {d['lon']}")
             
+            # si auto-ip failed
+            if not isinstance(d, dict) or ("lat" not in d) or ("lon" not in d):
+                err_txt = ""
+                if isinstance(d, dict):
+                    err_txt = str(d.get("_error", "")).strip()
+
+                # fallback au cas ou err_txt vide
+                if not err_txt:
+                    err_txt = "Service indisponible"
+
+                self.message(
+                    "Geoloc auto indisponible",
+                    "Impossible de recuperer ta localisation automatiquement (auto_ip).\n\n"
+                    "Cause probable: limite temporaire du service.\n"
+                    "Attends 1-2 minutes puis reessaie.\n\n"
+                    "Astuce: utilise un preset ou passe en mode fixed.\n\n"
+                    f"Details: {err_txt}"
+                )
+                return
+
+
             if "lat" in d and hasattr(self, "lat_entry"):
                 self.lat_entry.set_text(f"{d['lat']:.4f}")
             if "lon" in d and hasattr(self, "lon_entry"):
@@ -2310,14 +2430,30 @@ class App(Gtk.Window):
     def on_geo_mode_changed(self, _combo):
         """When user changes mode, adjust UI and preset."""
         # If user leaves fixed mode, reset preset to none (ergonomic)
-        mode = self.geo_combo.get_active_text()
+        mode = self.geo_combo.get_active_id()
         if mode != "fixed" and hasattr(self, "preset_combo"):
             # block preset change handler while updating
-            self.preset_combo.set_active_id("none")
+            self.preset_combo.set_active(0)
         if mode == "auto_ip":
             self._fill_from_auto_ip()
 
+        if mode == "fixed":
+            if hasattr(self, "_hid_preset_changed"):
+                self.preset_combo.handler_block(self._hid_preset_changed)
+
+            self.preset_combo.set_active(0)  # solution 2: no selection
+
+            if hasattr(self, "_hid_preset_changed"):
+                self.preset_combo.handler_unblock(self._hid_preset_changed)
+        
         self.refresh_geoloc_controls()
+        try:
+            if self.geo_combo.get_active_text() == "city":
+                self.city_entry.grab_focus()
+        except Exception:
+            pass
+
+
 
     def on_geo_preset_changed(self, _combo):
         preset_id = "none"
@@ -2354,7 +2490,7 @@ class App(Gtk.Window):
             self.city_entry.set_text(pretty)
 
             # Force fixed mode
-            self.geo_combo.set_active(["auto_ip", "fixed", "city"].index("fixed"))
+            self.geo_combo.set_active_id("fixed")
 
         self.refresh_geoloc_controls()
 
@@ -2518,7 +2654,7 @@ class App(Gtk.Window):
                 "coucher_start": int(self.spin_coucher.get_value()),
             }
 
-            cfg["geolocation"]["mode"] = self.geo_combo.get_active_text()
+            cfg["geolocation"]["mode"] = self.geo_combo.get_active_id()
             cfg["geolocation"]["fixed"]["lat"] = float(self.lat_entry.get_text().strip())
             cfg["geolocation"]["fixed"]["lon"] = float(self.lon_entry.get_text().strip())
             cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
@@ -2620,7 +2756,7 @@ class App(Gtk.Window):
             # Geoloc (mode + lat/lon + city + preset)
             cfg.setdefault("geolocation", {})
             if hasattr(self, "geo_combo"):
-                cfg["geolocation"]["mode"] = self.geo_combo.get_active_text()
+                cfg["geolocation"]["mode"] = self.geo_combo.get_active_id()
 
             if hasattr(self, "lat_entry") and hasattr(self, "lon_entry"):
                 try:
