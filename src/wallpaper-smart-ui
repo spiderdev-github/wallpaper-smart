@@ -293,6 +293,43 @@ def _http_json(url: str, timeout: int = 5) -> Dict[str, Any]:
         raise RuntimeError(f"Expected JSON object, got {type(obj).__name__}")
     return obj
 
+
+def geocode_city_nominatim(city: str, timeout: int = 6) -> Tuple[float, float, str]:
+    import json
+    from urllib.parse import quote
+
+    q = quote(city)
+    url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1&addressdetails=0"
+
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "wallpaper-smart/1.0 (UI geocode)",
+            "Accept": "application/json",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        raise RuntimeError(f"Nominatim error: {e}") from e
+
+    data = json.loads(raw)
+    if not isinstance(data, list) or not data:
+        raise RuntimeError("Ville introuvable. Essaie: 'Paris, FR'.")
+
+    item = data[0]
+    lat = float(item.get("lat"))
+    lon = float(item.get("lon"))
+    display = (item.get("display_name") or "").strip()
+
+    # Keep display short
+    if display and len(display) > 60:
+        display = display.split(",")[0].strip()
+
+    return lat, lon, display
+
 # ---------------- Theme detection + CSS ----------------
 
 def detect_dark_mode() -> bool:
@@ -548,18 +585,39 @@ def apply_css(dark: bool):
 
 
         /* Actionbar */
-            .actionbar {
-            padding: 10px;
-            background: #2B2B2B;
-            border: 0;
-            }
+        .actionbar {
+        padding: 10px;
+        background: #2B2B2B;
+        border: 0;
+        }
 
-            /* Tabs GNOME-like + icons */
-            .tab-icon { opacity: 0.90; }
-            .tab-text { font-weight: 700; }
-            notebook tab:checked {
-              box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.90);
-            }
+        /* Tabs GNOME-like + icons */
+        .tab-icon { opacity: 0.90; }
+        .tab-text { font-weight: 700; }
+        notebook tab:checked {
+            box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.90);
+        }
+        button:focus,
+        button:focus-visible {
+        outline: none;
+        box-shadow: none;
+        }
+
+        notebook tab:focus,
+        notebook tab:focus-visible {
+        outline: none;
+        box-shadow: none;
+        }
+
+        entry:focus,
+        entry:focus-visible,
+        spinbutton:focus,
+        spinbutton:focus-visible,
+        combobox:focus,
+        combobox:focus-visible {
+        outline: none;
+        box-shadow: none;
+        }
         """
     else:
         css = b"""
@@ -673,6 +731,29 @@ def apply_css(dark: bool):
         notebook tab:checked {
           box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.95);
         }
+
+        button:focus,
+        button:focus-visible {
+            outline: none;
+            box-shadow: none;
+        }
+
+        notebook tab:focus,
+        notebook tab:focus-visible {
+            outline: none;
+            box-shadow: none;
+        }
+
+        entry:focus,
+        entry:focus-visible,
+        spinbutton:focus,
+        spinbutton:focus-visible,
+        combobox:focus,
+        combobox:focus-visible {
+            outline: none;
+            box-shadow: none;
+        }
+
         """
 
 
@@ -1041,6 +1122,39 @@ class App(Gtk.Window):
         # Then every 10 minutes (avoid hammering API)
         GLib.timeout_add_seconds(600, self._timer_refresh_preset_icons)
 
+    def on_city_clear_clicked(self, _btn):
+        try:
+            self.city_entry.set_text("")
+            self.city_entry.grab_focus()
+        except Exception:
+            pass
+
+
+    def on_city_search_clicked(self, _btn):
+        try:
+            city = (self.city_entry.get_text() or "").strip()
+            if not city:
+                self.message("Ville", "Saisis une ville.")
+                self.city_entry.grab_focus()
+                return
+
+            lat, lon, display = geocode_city_nominatim(city, timeout=6)
+            self.lat_entry.set_text(f"{lat:.4f}")
+            self.lon_entry.set_text(f"{lon:.4f}")
+
+            # Optional: replace by normalized label
+            if display:
+                self.city_entry.set_text(display)
+
+            self.city_entry.grab_focus()
+        except Exception as e:
+            self.message("Erreur recherche ville", str(e))
+            try:
+                self.city_entry.grab_focus()
+            except Exception:
+                pass
+
+
     def on_clear_city(self, _btn):
         try:
             self.city_entry.set_text("")
@@ -1400,7 +1514,7 @@ class App(Gtk.Window):
             if mode == "preset":
                 self.dash_loc.set_text(f"Preset: {label} ({lat:.4f}, {lon:.4f})")
             elif mode == "fixed":
-                self.dash_loc.set_text(f"Manuel: {fixed.get('lat', '—')}, {fixed.get('lon', '—')}")
+                self.dash_loc.set_text(f"Manuel: {fixed.get('lat', '—')}, {fixed.get('lon', '—')} - {city}")
             elif mode == "city":
                 self.dash_loc.set_text(f"Ville: {city}")
             else:
@@ -1565,7 +1679,7 @@ class App(Gtk.Window):
         self.geo_combo = Gtk.ComboBoxText()
         self.geo_combo.append("auto_ip", "Geolocalisation")
         self.geo_combo.append("fixed", "Fixe")
-        self.geo_combo.append("city", "Ville")
+        # self.geo_combo.append("city", "Ville")
 
         current_mode = self.cfg.get("geolocation", {}).get("mode", "auto_ip")
         if current_mode not in ["auto_ip", "fixed", "city"]:
@@ -1661,17 +1775,25 @@ class App(Gtk.Window):
         g.attach(Gtk.Label(label="Ville", xalign=0), 0, 2, 1, 1)
 
         city_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        city_row.set_hexpand(True)
 
-        self.city_entry.set_hexpand(True)
+        self.city_entry = Gtk.Entry()
+        self.city_entry.set_text(self.cfg["geolocation"]["city_name"])
         city_row.pack_start(self.city_entry, True, True, 0)
 
-        self.btn_city_clear = Gtk.Button(label="✕")
-        self.btn_city_clear.set_size_request(36, -1)
-        self.btn_city_clear.connect("clicked", self.on_clear_city)
+        # Button: clear city
+        self.btn_city_clear = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
+        self.btn_city_clear.set_tooltip_text("Vider")
+        self.btn_city_clear.connect("clicked", self.on_city_clear_clicked)
         city_row.pack_start(self.btn_city_clear, False, False, 0)
 
+        # Button: geocode city -> lat/lon
+        self.btn_city_search = Gtk.Button.new_from_icon_name("system-search-symbolic", Gtk.IconSize.BUTTON)
+        self.btn_city_search.set_tooltip_text("Rechercher lat/lon")
+        self.btn_city_search.connect("clicked", self.on_city_search_clicked)
+        city_row.pack_start(self.btn_city_search, False, False, 0)
+
         g.attach(city_row, 1, 2, 1, 1)
+
 
 
         content.pack_start(g, False, False, 0)
@@ -1684,7 +1806,7 @@ class App(Gtk.Window):
         hint.get_style_context().add_class("muted")
         content.pack_start(hint, False, False, 0)
 
-        self.refresh_geoloc_controls()
+        # self.refresh_geoloc_controls()
 
         box.pack_start(make_card("Geolocalisation", content), False, False, 0)
         self.refresh_dashboard()
@@ -2319,7 +2441,9 @@ class App(Gtk.Window):
             preset_id = self.preset_store[it][0]
 
         preset_active = bool(preset_id and preset_id != "none")
+
         if mode == "fixed":
+            self.preset_combo.set_sensitive(True)
             if preset_active:
                 if hasattr(self, "lat_entry"):
                     self.lat_entry.set_sensitive(False)
@@ -2328,6 +2452,7 @@ class App(Gtk.Window):
                 if hasattr(self, "city_entry"):
                     self.city_entry.set_sensitive(False)
                 self.btn_city_clear.set_sensitive(False)
+                self.btn_city_search.set_sensitive(False)
             else:
                 if hasattr(self, "lat_entry"):
                     self.lat_entry.set_sensitive(True)
@@ -2337,11 +2462,17 @@ class App(Gtk.Window):
                     self.city_entry.set_sensitive(True)
 
                 self.btn_city_clear.set_sensitive(True)
+                self.btn_city_search.set_sensitive(True)
                 
                 self.city_entry.set_text("")
                 self.lat_entry.set_text("")
                 self.lon_entry.set_text("")
         elif mode == "city":
+            self.preset_combo.set_sensitive(False)
+            try:
+                self.city_entry.grab_focus()
+            except Exception:
+                pass
             if hasattr(self, "lat_entry"):
                 self.lat_entry.set_sensitive(False)
             if hasattr(self, "lon_entry"):
@@ -2354,7 +2485,9 @@ class App(Gtk.Window):
             self.lat_entry.set_text("")
             self.city_entry.set_text("")
             self.btn_city_clear.set_sensitive(True)
+            self.btn_city_search.set_sensitive(True)
         else:
+            self.preset_combo.set_sensitive(False)
             # auto_ip
             if hasattr(self, "lat_entry"):
                 self.lat_entry.set_sensitive(False)
@@ -2363,6 +2496,7 @@ class App(Gtk.Window):
             if hasattr(self, "city_entry"):
                 self.city_entry.set_sensitive(False)
             self.btn_city_clear.set_sensitive(False)
+            self.btn_city_search.set_sensitive(False)
 
         # Optionnel: bouton clear ville
         #if hasattr(self, "btn_city_clear"):
@@ -2697,7 +2831,7 @@ class App(Gtk.Window):
                 cfg["geolocation"]["preset"] = preset_id
 
 
-            self.refresh_geoloc_controls()
+            # self.refresh_geoloc_controls()
 
 
             

@@ -289,8 +289,7 @@ chmod +x uninstall.sh
 - [x] Météo en temps réel pour les localisations prédéfinies
 - [ ] Ajouter la gestion multilingue
 - [ ] Détecter la géolocalisation à l’installation pour définir la latitude/longitude par défaut
-- [ ] Section géolocalisation : en mode « Ville », récupérer la latitude/longitude à partir de la ville
-- [ ] Section géolocalisation : en mode « Fixe », récupérer la ville à partir de la latitude/longitude
+- [x] Section géolocalisation : en mode « Ville », récupérer la latitude/longitude à partir de la ville saisie
 - [ ] Permettre la gestion des thèmes sombre et clair pour les fonds d’écran
 
 
