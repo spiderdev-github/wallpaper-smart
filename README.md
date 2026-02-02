@@ -276,7 +276,7 @@ chmod +x uninstall.sh
 
 ## 🗺️ Roadmap
 
-- [ ] Ajouter une section « À propos » dans l’interface
+- [x] Ajouter une section « À propos » dans l’interface
 - [ ] Ajouter un bouton « Don »
 - [ ] Améliorer les logs (interface plus lisible)
 - [ ] Gestion avancée des thèmes (aperçu + import/export)

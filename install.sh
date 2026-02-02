@@ -6,7 +6,7 @@ set -Eeuo pipefail
 # - Supports systemd user timers when available, otherwise installs scripts + desktop launcher only
 
 DEBUG=0
-WALLDIR_DEFAULT="$HOME/Images/wallpaper"
+WALLDIR_DEFAULT="$HOME/.config/wallpaper-smart/wallpaper"
 CFG_DIR="$HOME/.config/wallpaper-smart"
 CFG_FILE="$CFG_DIR/config.json"
 

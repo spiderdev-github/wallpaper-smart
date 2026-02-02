@@ -156,34 +156,55 @@ DEFAULT_CFG = {
 #     "auckland": ("Auckland 🇳🇿", (-36.8485, 174.7633)),
 # }
 
+# GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
+#     "none": ("Aucun (mode normal)", None),
+
+#     "ae_dubai": ("🇦🇪 Dubai", (25.2048, 55.2708)),
+#     "au_sydney": ("🇦🇺 Sydney", (-33.8688, 151.2093)),
+#     "br_rio": ("🇧🇷 Rio de Janeiro", (-22.9068, -43.1729)),
+#     "ca_vancouver": ("🇨🇦 Vancouver", (49.2827, -123.1207)),
+#     "cn_beijing": ("🇨🇳 Pekin", (39.9042, 116.4074)),
+#     "eg_cairo": ("🇪🇬 Le Caire", (30.0444, 31.2357)),
+#     "fr_paris": ("🇫🇷 Paris", (48.8566, 2.3522)),
+#     "fr_strasbourg": ("🇫🇷 Strasbourg", (48.5734, 7.7521)),
+#     "gb_london": ("🇬🇧 Londres", (51.5074, -0.1278)),
+#     "id_jakarta": ("🇮🇩 Jakarta", (-6.2088, 106.8456)),
+#     "in_delhi": ("🇮🇳 Delhi", (28.6139, 77.2090)),
+#     "is_reykjavik": ("🇮🇸 Reykjavik", (64.1466, -21.9426)),
+#     "jp_tokyo": ("🇯🇵 Tokyo", (35.6762, 139.6503)),
+#     "ma_casablanca": ("🇲🇦 Casablanca", (33.5731, -7.5898)),
+#     "no_oslo": ("🇳🇴 Oslo", (59.9139, 10.7522)),
+#     "nl_amsterdam": ("🇳🇱 Amsterdam", (52.3676, 4.9041)),
+#     "ru_kazan": ("🇷🇺 Kazan", (55.7961, 49.1064)),
+#     "ru_moscow": ("🇷🇺 Moscou", (55.7558, 37.6173)),
+#     "sg_singapore": ("🇸🇬 Singapore", (1.3521, 103.8198)),
+#     "th_bangkok": ("🇹🇭 Bangkok", (13.7563, 100.5018)),
+#     "tr_istanbul": ("🇹🇷 Istanbul", (41.0082, 28.9784)),
+#     "us_los_angeles": ("🇺🇸 Los Angeles", (34.0522, -118.2437)),
+#     "us_new_york": ("🇺🇸 New York", (40.7128, -74.0060)),
+# }
+
 GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
     "none": ("Aucun (mode normal)", None),
 
-    "ae_dubai": ("🇦🇪 Dubai", (25.2048, 55.2708)),
-    "au_sydney": ("🇦🇺 Sydney", (-33.8688, 151.2093)),
-    "br_rio": ("🇧🇷 Rio de Janeiro", (-22.9068, -43.1729)),
-    "ca_vancouver": ("🇨🇦 Vancouver", (49.2827, -123.1207)),
-    "cn_beijing": ("🇨🇳 Pekin", (39.9042, 116.4074)),
-    "eg_cairo": ("🇪🇬 Le Caire", (30.0444, 31.2357)),
-    "fr_paris": ("🇫🇷 Paris", (48.8566, 2.3522)),
-    "fr_strasbourg": ("🇫🇷 Strasbourg", (48.5734, 7.7521)),
-    "gb_london": ("🇬🇧 Londres", (51.5074, -0.1278)),
-    "id_jakarta": ("🇮🇩 Jakarta", (-6.2088, 106.8456)),
-    "in_delhi": ("🇮🇳 Delhi", (28.6139, 77.2090)),
-    "is_reykjavik": ("🇮🇸 Reykjavik", (64.1466, -21.9426)),
-    "jp_tokyo": ("🇯🇵 Tokyo", (35.6762, 139.6503)),
-    "ma_casablanca": ("🇲🇦 Casablanca", (33.5731, -7.5898)),
-    "no_oslo": ("🇳🇴 Oslo", (59.9139, 10.7522)),
-    "nl_amsterdam": ("🇳🇱 Amsterdam", (52.3676, 4.9041)),
-    "ru_kazan": ("🇷🇺 Kazan", (55.7961, 49.1064)),
-    "ru_moscow": ("🇷🇺 Moscou", (55.7558, 37.6173)),
-    "sg_singapore": ("🇸🇬 Singapore", (1.3521, 103.8198)),
+    "et_addis_ababa": ("🇪🇹 Addis Abeba", (8.9806, 38.7578)),
     "th_bangkok": ("🇹🇭 Bangkok", (13.7563, 100.5018)),
-    "tr_istanbul": ("🇹🇷 Istanbul", (41.0082, 28.9784)),
-    "us_los_angeles": ("🇺🇸 Los Angeles", (34.0522, -118.2437)),
-    "us_new_york": ("🇺🇸 New York", (40.7128, -74.0060)),
+    "cn_beijing": ("🇨🇳 Pekin", (39.9042, 116.4074)),
+    "de_berlin": ("🇩🇪 Berlin", (52.5200, 13.4050)),
+    "ar_buenos_aires": ("🇦🇷 Buenos Aires", (-34.6037, -58.3816)),
+    "au_canberra": ("🇦🇺 Canberra", (-35.2809, 149.1300)),
+    "eg_cairo": ("🇪🇬 Le Caire", (30.0444, 31.2357)),
+    "sn_dakar": ("🇸🇳 Dakar", (14.7167, -17.4677)),
+    "qa_doha": ("🇶🇦 Doha", (25.2854, 51.5310)),
+    "id_jakarta": ("🇮🇩 Jakarta", (-6.2088, 106.8456)),
+    "mx_mexico_city": ("🇲🇽 Mexico", (19.4326, -99.1332)),
+    "ru_moscow": ("🇷🇺 Moscou", (55.7558, 37.6173)),
+    "fr_paris": ("🇫🇷 Paris", (48.8566, 2.3522)),
+    "cz_prague": ("🇨🇿 Prague", (50.0755, 14.4378)),
+    "it_rome": ("🇮🇹 Rome", (41.9028, 12.4964)),
+    "kr_seoul": ("🇰🇷 Seoul", (37.5665, 126.9780)),
+    "jp_tokyo": ("🇯🇵 Tokyo", (35.6762, 139.6503)),
 }
-
 
 
 def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
@@ -981,6 +1002,10 @@ class App(Gtk.Window):
         self.images_tab = self.build_tab_images()
         self.nb.append_page(self.images_tab, make_tab_label("Images", "image-x-generic-symbolic"))
 
+        # btn tab About
+        self.nb.append_page(self.build_tab_about(), make_tab_label("A propos", "help-about-symbolic"))
+
+
         # Action bar
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         bar.get_style_context().add_class("actionbar")
@@ -996,11 +1021,14 @@ class App(Gtk.Window):
 
         btn_logs = Gtk.Button(label="Voir logs")
         btn_logs.connect("clicked", self.on_logs)
+        
+
 
         self.btn_toggle = Gtk.Button()
         self.btn_toggle.connect("clicked", self.on_toggle_timer)
         self.refresh_toggle_label()
 
+        
         bar.pack_start(btn_save, False, False, 0)
         bar.pack_start(btn_test, False, False, 0)
         bar.pack_start(btn_logs, False, False, 0)
@@ -1706,6 +1734,153 @@ class App(Gtk.Window):
             pass
 
         return make_page(page)
+
+    # def build_tab_about(self):
+    #     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+    #     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+    #     title = Gtk.Label(label="Wallpaper Smart", xalign=0)
+    #     title.get_style_context().add_class("card-title")
+
+    #     txt = Gtk.Label(
+    #         label=(
+    #             "Application de fond d’ecran dynamique (heure + meteo).\n"
+    #             "Compatible GNOME / KDE.\n\n"
+    #             "Licence: MIT\n"
+    #             "Auteur: Spiderdev"
+    #         ),
+    #         xalign=0
+    #     )
+    #     txt.set_line_wrap(True)
+    #     txt.get_style_context().add_class("muted")
+
+    #     content.pack_start(title, False, False, 0)
+    #     content.pack_start(txt, False, False, 0)
+
+    #     box.pack_start(make_card("A propos", content), False, False, 0)
+    #     return make_page(box)
+
+    def build_tab_about(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+
+        # You can move this to a global constant later
+        app_version = "1.0.0"
+
+        # Header: icon + title + subtitle
+        header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+
+        icon = Gtk.Image.new_from_icon_name("preferences-desktop-wallpaper", Gtk.IconSize.DIALOG)
+        icon.set_pixel_size(56)
+
+        titles = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        title = Gtk.Label(label="Wallpaper Smart", xalign=0)
+        title.get_style_context().add_class("card-title")
+
+        subtitle = Gtk.Label(
+            label="Fond d'ecran dynamique (heure + meteo) - GNOME / KDE",
+            xalign=0
+        )
+        subtitle.get_style_context().add_class("muted")
+        subtitle.set_line_wrap(True)
+
+        titles.pack_start(title, False, False, 0)
+        titles.pack_start(subtitle, False, False, 0)
+
+        header.pack_start(icon, False, False, 0)
+        header.pack_start(titles, True, True, 0)
+
+        content.pack_start(header, False, False, 0)
+
+        # Badges row (chips)
+        chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        chip_version = Gtk.Label(label=f"Version {app_version}")
+        chip_version.get_style_context().add_class("chip")
+        chip_version.get_style_context().add_class("chip-ok")
+
+        chip_license = Gtk.Label(label="Licence MIT")
+        chip_license.get_style_context().add_class("chip")
+        chip_license.get_style_context().add_class("chip-ok")
+
+        desktop = "GNOME / KDE"
+        chip_desktop = Gtk.Label(label=desktop)
+        chip_desktop.get_style_context().add_class("chip")
+        chip_desktop.get_style_context().add_class("chip-ok")
+
+        chips.pack_start(chip_version, False, False, 0)
+        chips.pack_start(chip_license, False, False, 0)
+        chips.pack_start(chip_desktop, False, False, 0)
+
+        content.pack_start(chips, False, False, 0)
+
+        # Author line with clickable link
+        author_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        author_lbl = Gtk.Label(label="Auteur:", xalign=0)
+        author_lbl.get_style_context().add_class("muted")
+
+        author_link = Gtk.LinkButton.new_with_label("https://spiderdev.fr", "Spiderdev")
+        author_link.set_halign(Gtk.Align.START)
+
+        author_box.pack_start(author_lbl, False, False, 0)
+        author_box.pack_start(author_link, False, False, 0)
+
+        content.pack_start(author_box, False, False, 0)
+
+        # Short description card text
+        desc = Gtk.Label(
+            label=(
+                "Wallpaper Smart change automatiquement votre fond d'ecran selon l'heure "
+                "et la meteo locale. Vous pouvez aussi definir des images meteo par theme."
+            ),
+            xalign=0
+        )
+        desc.set_line_wrap(True)
+        desc.get_style_context().add_class("muted")
+        content.pack_start(desc, False, False, 0)
+
+        # Donations card (more visible)
+        donate = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        donate_title = Gtk.Label(label="Soutenir le projet", xalign=0)
+        donate_title.get_style_context().add_class("card-title")
+        donate.pack_start(donate_title, False, False, 0)
+
+        donate_txt = Gtk.Label(
+            label="Si l'app vous aide, un petit don permet de financer le temps de dev et les evolutions.",
+            xalign=0
+        )
+        donate_txt.set_line_wrap(True)
+        donate_txt.get_style_context().add_class("muted")
+        donate.pack_start(donate_txt, False, False, 0)
+
+        donate_buttons = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        # btn_site = Gtk.LinkButton.new_with_label("https://spiderdev.fr", "Don via Spiderdev")
+        # btn_site.get_style_context().add_class("accent")
+
+        # Put your real links here
+        btn_paypal = Gtk.LinkButton.new_with_label("https://www.paypal.com/paypalme/lalsarok1", "PayPal")
+        btn_paypal.get_style_context().add_class("warn")
+
+        btn_bmac = Gtk.LinkButton.new_with_label("https://buymeacoffee.com/spiderdev", "Buy Me a Coffee")
+        btn_bmac.get_style_context().add_class("accent")
+
+        # donate_buttons.pack_start(btn_site, False, False, 0)
+        donate_buttons.pack_start(btn_paypal, False, False, 0)
+        donate_buttons.pack_start(btn_bmac, False, False, 0)
+
+        donate.pack_start(donate_buttons, False, False, 0)
+
+        # Assemble cards
+        box.pack_start(make_card("A propos", content), False, False, 0)
+        box.pack_start(make_card("Dons", donate), False, False, 0)
+
+        return make_page(box)
+
 
     def _compute_current_moment_key(self) -> str:
         """Return current moment according to schedule and current hour."""
