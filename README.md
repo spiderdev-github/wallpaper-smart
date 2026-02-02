@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/platform-Linux-blue)
-![Desktop](https://img.shields.io/badge/desktop-GNOME-orange)
+![Desktop](https://img.shields.io/badge/desktop-GNOME%20%7C%20KDE-orange)
 ![GTK](https://img.shields.io/badge/GTK-3.x-purple)
 
 Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le fond d’écran selon :
@@ -40,10 +40,13 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
 
 ## 🧩 Compatibilité
 
-- ✅ Ubuntu / Debian (GNOME)
+- ✅ Ubuntu / Debian
 - ✅ GTK3
 - ✅ systemd (user services)
-- ⚠️ Utilise `gsettings` → support GNOME prioritaire
+- ✅ GNOME
+- ✅ KDE Plasma (support via script)
+
+> L'application detecte automatiquement l'environnement (GNOME / KDE) et applique le wallpaper via la methode adaptee.
 
 ---
 
@@ -267,7 +270,7 @@ chmod +x uninstall.sh
 - [ ] Ajout d'un bouton "Don"
 - [ ] Ameliorer les logs (UI plus lisible)
 - [ ] Gestion avancee des themes (preview + import/export)
-- [ ] Support KDE (si possible)
+- [x] Support KDE Plasma
 
 ---
 
@@ -289,7 +292,7 @@ journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 ```
 
 ### Est-ce compatible KDE ?
-Pas encore. L'application utilise `gsettings` (GNOME).
+Oui. Wallpaper Smart supporte GNOME et KDE Plasma.
 
 ---
 
