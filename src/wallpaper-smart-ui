@@ -958,7 +958,7 @@ class App(Gtk.Window):
         title = Gtk.Label(label="Wallpaper Smart", xalign=0)
         title.get_style_context().add_class("header-title")
 
-        sub = Gtk.Label(label="Fond d’écran dynamique • heure + météo • style GNOME", xalign=0)
+        sub = Gtk.Label(label="Fond d’écran dynamique • heure + météo", xalign=0)
         sub.get_style_context().add_class("header-sub")
 
         header.pack_start(title, False, False, 0)
@@ -970,7 +970,7 @@ class App(Gtk.Window):
         root.pack_start(self.nb, True, True, 0)
 
         self.nb.append_page(self.build_tab_general(), make_tab_label("Général", "preferences-system-symbolic"))
-        self.nb.append_page(self.build_tab_time(),    make_tab_label("Planning",    "alarm-symbolic"))
+        self.nb.append_page(self.build_tab_time(),    make_tab_label("Horaires",    "alarm-symbolic"))
         
         self.nb.append_page(self.build_tab_geoloc(),  make_tab_label("Localisation",   "mark-location-symbolic"))
         self.refresh_preset_icons_async()
@@ -1013,7 +1013,6 @@ class App(Gtk.Window):
 
     def _select_preset_in_combo_from_cfg(self):
         # No accents in comments
-        print('==> _select_preset_in_combo_from_cfg');
         try:
             preset_id = self.cfg.get("geolocation", {}).get("preset", "none")
             if not preset_id or preset_id == "none":
@@ -1585,8 +1584,7 @@ class App(Gtk.Window):
         self._select_preset_in_combo_from_cfg()
         self.preset_combo.handler_unblock(hid)
 
-        self.preset_store.append(["none", "Aucun preset", "", 0.0, 0.0])
-
+        
         content.pack_start(preset_lbl, False, False, 0)
         content.pack_start(self.preset_combo, False, False, 0)
 

@@ -244,11 +244,11 @@ cp -f "$CHOSEN" "$TARGET"
 # Apply wallpaper GNOME / KDE
 # -----------------------------
 if [[ "$DESKTOP" == *"gnome"* ]]; then
-  if command -v gsettings >/dev/null 2>&1 && gsettings set org.gnome.desktop.background picture-uri "file://$TARGET" 2>/dev/null; then
+  if gsettings set org.gnome.desktop.background picture-uri "file://$TARGET" 2>/dev/null; then
     gsettings set org.gnome.desktop.background picture-uri-dark "file://$TARGET" 2>/dev/null || true
-    log "✅ Wallpaper: $CHOSEN (GNOME | moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+    log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
   else
-    log "WARN: gsettings a echoue (GNOME pas pret). Fichier pret: $TARGET"
+    warn "gsettings a échoué (session GNOME pas prête). Fichier prêt: $TARGET"
   fi
 
 elif [[ "$DESKTOP" == *"kde"* || "$DESKTOP" == *"plasma"* ]]; then
