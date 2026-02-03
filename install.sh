@@ -16,7 +16,7 @@ TEMPLATES_SRC="$SCRIPT_DIR/wallpaper/templates"
 
 usage() {
   cat <<EOF
-Usage: $0 [--debug] [--walldir <path>] [--minutes <n>] [--no-deps] [--force-templates]
+Usage: $0 [--no-geo] [--debug] [--walldir <path>] [--minutes <n>] [--no-deps] [--force-templates]
 
 Options:
   --walldir <path>        Wallpaper root directory (default: $WALLDIR_DEFAULT)
@@ -25,11 +25,18 @@ Options:
   --no-deps               Do not attempt to install dependencies (only checks + hints)
   --force-templates        Overwrite existing templates files (default: copy missing only)
   --debug                 Verbose mode
+  --no-geo                Do not attempt to detect geolocation during install
 EOF
 }
 
+
+LAT_DEFAULT="48.8566"
+LON_DEFAULT="2.3522"
+CITY_DEFAULT="Paris"
+NO_GEO=0
+
 WALLDIR="$WALLDIR_DEFAULT"
-MINUTES="10"
+MINUTES="1"
 NO_DEPS=0
 FORCE_TEMPLATES=0
 
@@ -40,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     --minutes) MINUTES="${2:-}"; shift 2 ;;
     --no-deps) NO_DEPS=1; shift ;;
     --force-templates) FORCE_TEMPLATES=1; shift ;;
+    --no-geo) NO_GEO=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Argument inconnu: $1"; usage; exit 2 ;;
   esac
@@ -167,6 +175,59 @@ from gi.repository import Gtk, Gio, GLib
 PY
 }
 
+
+get_geo_defaults() {
+  # Best effort IP geolocation (one-shot). Falls back to defaults.
+  local geo_json out
+
+  GEO_LAT="$LAT_DEFAULT"
+  GEO_LON="$LON_DEFAULT"
+  GEO_CITY="$CITY_DEFAULT"
+
+  command -v curl >/dev/null 2>&1 || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+
+  geo_json="$(curl -fsSL --max-time 4 "https://ipapi.co/json/" 2>/dev/null || true)"
+  [[ -z "$geo_json" ]] && return 0
+
+out="$(printf '%s' "$geo_json" | python3 -c '
+import json, sys
+try:
+    d = json.loads(sys.stdin.read())
+    lat = d.get("latitude")
+    lon = d.get("longitude")
+    city = (d.get("city") or "").strip()
+    region = (d.get("region") or "").strip()
+    country = (d.get("country_name") or d.get("country") or "").strip()
+
+    parts = [p for p in (city, region, country) if p]
+    city_label = ", ".join(parts) if parts else ""
+
+    if lat is None or lon is None:
+        print("||")
+    else:
+        print(f"{float(lat)}|{float(lon)}|{city_label}")
+except Exception:
+    print("||")
+' 2>/dev/null || true)"
+  # Parse "lat|lon|city"
+  local lat lon city
+  lat="${out%%|*}"
+  out="${out#*|}"
+  lon="${out%%|*}"
+  city="${out#*|}"
+
+
+  if [[ -n "$lat" && -n "$lon" ]]; then
+    GEO_LAT="$lat"
+    GEO_LON="$lon"
+  fi
+  if [[ -n "$city" ]]; then
+    GEO_CITY="$city"
+  fi
+}
+
+
 log "Vérification dépendances..."
 NEED_INSTALL=0
 for c in curl jq python3; do
@@ -254,6 +315,19 @@ copy_templates
 # -----------------------------
 # Config JSON (create or upgrade) - using python (portable)
 # -----------------------------
+if [[ "$NO_GEO" != "1" ]]; then
+  get_geo_defaults
+  log "Geo defaults: lat=$GEO_LAT lon=$GEO_LON city=$GEO_CITY"
+  GEO_MODE="auto_ip"
+else
+  log "No geoloc on install"
+  GEO_LAT="$LAT_DEFAULT"
+  GEO_LON="$LON_DEFAULT"
+  GEO_CITY="$CITY_DEFAULT"
+  GEO_MODE="fixed"
+fi
+
+
 log "Création/upgrade config: $CFG_FILE"
 python3 - <<PY
 import json, os
@@ -269,9 +343,9 @@ default = {
   "wallpaper_theme": "default",
   "schedule": {"nuit_start": 19, "aube_start": 5, "midi_start": 11, "coucher_start": 17},
   "geolocation": {
-    "mode": "auto_ip",
-    "fixed": {"lat": 48.5839, "lon": 7.7455},
-    "city_name": "Strasbourg",
+    "mode": "${GEO_MODE}",
+    "fixed": {"lat": ${GEO_LAT}, "lon": ${GEO_LON}},
+    "city_name": "${GEO_CITY}",
     "preset": "none",
   },
   "weather_mapping": {

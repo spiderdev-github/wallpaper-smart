@@ -282,13 +282,13 @@ chmod +x uninstall.sh
 ## 🗺️ Roadmap
 
 - [x] Ajouter une section « À propos » dans l’interface
-- [ ] Ajouter un bouton « Don »
+- [x] Ajouter un bouton « Don »
 - [ ] Améliorer les logs (interface plus lisible)
 - [ ] Gestion avancée des thèmes (aperçu + import/export)
 - [x] Support de KDE Plasma
 - [x] Météo en temps réel pour les localisations prédéfinies
 - [ ] Ajouter la gestion multilingue
-- [ ] Détecter la géolocalisation à l’installation pour définir la latitude/longitude par défaut
+- [x] Détecter la géolocalisation à l’installation pour définir la latitude/longitude par défaut (opetion désactivable)
 - [x] Section géolocalisation : en mode « Ville », récupérer la latitude/longitude à partir de la ville saisie
 - [ ] Permettre la gestion des thèmes sombre et clair pour les fonds d’écran
 

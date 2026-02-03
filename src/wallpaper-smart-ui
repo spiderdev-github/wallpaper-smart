@@ -63,6 +63,7 @@ DEFAULT_CFG = {
     "enabled_images": {},  # NEW: per-image toggle (rel path -> bool)
 }
 
+APP_VERSION = "1.0.0"
 
 # Presets de géolocalisation (simulation météo)
 # Choisir un preset remplit Lat/Lon et force le mode "fixed" (sans sauvegarder tant que tu n'as pas cliqué Enregistrer).
@@ -1931,7 +1932,7 @@ class App(Gtk.Window):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
 
         # You can move this to a global constant later
-        app_version = "1.0.0"
+        app_version = APP_VERSION
 
         # Header: icon + title + subtitle
         header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
