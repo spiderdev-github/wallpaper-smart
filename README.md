@@ -306,6 +306,7 @@ chmod +x uninstall.sh
   ```bash
   ~/.local/bin/wallpaper-smart.sh
   ```
+- Essaye d'activer/désactiver le style claire/sombre de ton OS
 
 ### Ou sont les logs ?
 ```bash
