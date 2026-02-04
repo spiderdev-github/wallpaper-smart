@@ -154,8 +154,8 @@ Installateur (best-effort) :
 ### 1) Cloner le repo
 
 ```bash
-git clone https://github.com/<ton-user>/<ton-repo>.git
-cd <ton-repo>
+git clone https://github.com/spiderdev-github/wallpaper-smart.git
+cd wallpaper-smart
 ```
 
 ### 2) Lancer l’installateur
