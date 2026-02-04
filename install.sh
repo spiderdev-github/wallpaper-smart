@@ -13,6 +13,7 @@ CFG_FILE="$CFG_DIR/config.json"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$SCRIPT_DIR/src"
 TEMPLATES_SRC="$SCRIPT_DIR/wallpaper/templates"
+LANG_SRC="$SCRIPT_DIR/lang"
 
 usage() {
   cat <<EOF
@@ -280,6 +281,8 @@ install -m 755 "$SRC/wallpaper-smart.sh" "$HOME/.local/bin/wallpaper-smart.sh"
 install -m 755 "$SRC/wallpaper-smart-ui" "$HOME/.local/bin/wallpaper-smart-ui"
 install -m 755 "$SRC/wallpaper-smart-mkplaceholders.sh" "$HOME/.local/bin/wallpaper-smart-mkplaceholders.sh"
 
+log "Installation des langs dans ~/.config/wallpaper-smart (écrasement si existant)..."
+
 # Templates (optional)
 copy_templates() {
   [[ -d "$TEMPLATES_SRC" ]] || { warn "Templates absents: $TEMPLATES_SRC"; return 0; }
@@ -293,6 +296,9 @@ copy_templates() {
       log "Copie templates (rsync, sans écraser les fichiers existants)..."
       rsync -a --ignore-existing "$TEMPLATES_SRC"/ "$WALLDIR/templates"/
     fi
+    log "Copie des langues (rsync, sans écraser les fichiers existants)..."
+    rsync -a --delete "$LANG_SRC"/ "$CFG_DIR/lang"/
+
   else
     log "rsync non présent -> copie simple (cp)."
     if [[ "$FORCE_TEMPLATES" == "1" ]]; then
@@ -308,6 +314,7 @@ copy_templates() {
         fi
       done
     fi
+    cp -a "$LANG_SRC"/. "$CFG_DIR/lang"/
   fi
 }
 copy_templates

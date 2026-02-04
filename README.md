@@ -14,7 +14,13 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
 
 ---
 
-## ✨ Fonctionnalités
+## 🚀 Version
+
+**v1.1.0**
+
+---
+
+## ✨ Fonctionnalités (principales)
 
 - 🌗 **Fond d’écran dynamique par moment**
   - aube / midi / coucher / nuit
@@ -23,9 +29,20 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
   - clear / cloudy / fog / rain / snow / thunder
   - mapping configurable (`clair`, `nuageux`, etc.)
 
-- 🎨 **Thèmes de wallpapers**
-  - gestion via dossier `templates/<theme>/...`
-  - sélection dans l’UI
+- 🎨 **Thèmes de wallpapers (templates)**
+  - gestion via `templates/<theme>/...`
+  - sélection du thème dans l’UI
+  - validation automatique d’un thème (base + 4 images minimum)
+
+- 📍 **Localisation**
+  - géolocalisation par IP (**auto_ip**)
+  - mode manuel (**fixed**)
+  - mode **Ville** avec recherche lat/lon via OpenStreetMap (**Nominatim**)
+  - presets “grandes capitales” avec **icône météo en temps réel** (indicatif)
+
+- 🌍 **Multi‑langue (UI)**
+  - Français, Anglais, Allemand, Espagnol, Arabe, Russe, Chinois  
+  *(selon les fichiers disponibles dans `lang/`)*
 
 - 🖥️ **Interface GTK (Wallpaper Smart UI)**
   - aperçu des images
@@ -33,18 +50,27 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
   - activation/désactivation par image météo
   - test immédiat sans sauvegarder
 
-- ⏱️ **Mise à jour automatique via systemd timer**
-  - exécution toutes les X minutes
+- ⏱️ **Mise à jour automatique**
+  - via **systemd user timer** (si disponible)
+  - sinon possibilité de planifier via cron
+
+- 📍 **Géolocalisation à l’installation (optionnel)**
+  - détecte une localisation par défaut lors du `install.sh`
+  - désactivable avec `--no-geo`
+
+- ℹ️ **Section “À propos”**
+  - infos du projet + liens
+  - liens pour dons (PayPal / BuyMeACoffee)
 
 ---
 
 ## 🧩 Compatibilité
 
-- ✅ Ubuntu / Debian
-- ✅ GTK3
-- ✅ systemd (user services)
-- ✅ GNOME
+- ✅ Linux (multi‑distributions)
+- ✅ GNOME (gsettings)
 - ✅ KDE Plasma (support via script)
+- ✅ GTK3 (UI)
+- ✅ systemd user (optionnel mais recommandé)
 
 > L'application detecte automatiquement l'environnement (GNOME / KDE) et applique le wallpaper via la methode adaptee.
 
@@ -52,15 +78,13 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
 
 ## 📦 Dépendances
 
-Installées automatiquement via `install.sh` :
+Installateur (best-effort) :
 
-- `curl`
-- `jq`
-- `python3-gi`
-- `python3-gi-cairo`
-- `gir1.2-gtk-3.0`
-- `qdbus-qt5`
-
+- `bash`, `curl`, `jq`
+- `python3`
+- `python3-gi` + GTK3 + Cairo (selon distro)
+- `xdg-utils`
+- KDE : `qdbus` ou `qdbus-qt5` (selon distribution)
 
 ---
 
@@ -76,30 +100,31 @@ Installées automatiquement via `install.sh` :
 │   ├── wallpaper-smart.service
 │   ├── wallpaper-smart.timer
 │   └── wallpaper-smart-mkplaceholders.sh
-└── wallpaper/
-    └── templates/
-        ├── default/
-        │   ├── base/
-        │   │   ├── aube.png
-        │   │   ├── midi.png
-        │   │   ├── coucher.png
-        │   │   └── nuit.png
-        │   └── meteo/
-        │       ├── clair_aube.png
-        │       ├── clair_midi.png
-        │       └── ...
-        └── flat/
-            ├── base/
-            └── meteo/
+├── wallpaper/
+│   └── templates/
+│       └── default/
+│       │   ├── base/
+│       │   │   ├── aube.png
+│       │   │   ├── midi.png
+│       │   │   ├── coucher.png
+│       │   │   └── nuit.png
+│       │   └── meteo/
+│       │       ├── clair_aube.png
+│       │       ├── clair_midi.png
+│       │       └── ...
+│       │
+│       └── ...
+│
+└── lang/
+    ├── en_US.json
+    ├── fr_FR.json
+    ├── de_DE.json
+    └── ...
 ```
-
----
 
 ## 📸 Screenshots
 
 > Ajoute tes screenshots dans `assets/screenshots/` puis adapte les liens ici.
-
-Exemples :
 
 - Général  
   ![General](assets/screenshots/general.png)
@@ -115,8 +140,6 @@ Exemples :
 
 - Images  
   ![Images](assets/screenshots/images.png)
-
-
 
 ---
 
@@ -139,9 +162,13 @@ chmod +x install.sh
 #### Options utiles
 
 ```bash
---no-deps : ne tente pas d’installer les dépendances (juste check + hints)
---force-templates : écrase les templates existants (sinon il copie seulement les manquants)
---debug : mode verbose
+  --walldir <chemin>      Répertoire racine des fonds d’écran
+  --minutes <n>           Fréquence du timer (systemd uniquement) (défaut : 10)
+  --no-deps               Ne pas essayer d’installer les dépendances (vérifications + conseils uniquement)
+  --force-templates       Écraser les fichiers de templates existants (défaut : copie uniquement les fichiers manquants)
+  --debug                 Mode verbeux
+  --no-geo                Ne pas tenter de détecter la géolocalisation pendant l’installation
+
 ```bash
 
 ✅ Une entrée apparaîtra dans tes applications : **Wallpaper Smart**
@@ -150,7 +177,7 @@ chmod +x install.sh
 
 ## ⚙️ Configuration
 
-Le fichier de configuration est ici :
+Fichier de config :
 
 ```bash
 ~/.config/wallpaper-smart/config.json
@@ -160,22 +187,18 @@ Exemple :
 
 ```json
 {
-
-  "wallpaper_dir": "~/.config/wallpaper",
+  "wallpaper_dir": "/home/user/.config/wallpaper-smart/wallpaper",
   "wallpaper_theme": "default",
   "schedule": {
-    "nuit_start": 20,
+    "nuit_start": 19,
     "aube_start": 5,
     "midi_start": 11,
     "coucher_start": 17
   },
   "geolocation": {
     "mode": "auto_ip",
-    "fixed": {
-      "lat": 47.7463,
-      "lon": 7.3276
-    },
-    "city_name": "Mulhouse, Grand Est, France",
+    "fixed": { "lat": 48.5839, "lon": 7.7455 },
+    "city_name": "Strasbourg",
     "preset": "none"
   },
   "weather_mapping": {
@@ -187,9 +210,11 @@ Exemple :
     "thunder": "orage"
   },
   "timer_minutes": 10,
-  "enabled_images": {}
+  "enabled_images": {},
+  "ui": {
+    "language": "system"
+  }
 }
-
 ```
 
 ---
@@ -277,21 +302,28 @@ chmod +x uninstall.sh
 ./uninstall.sh
 ```
 
+### Options utiles
+
+```bash
+--remove-config          Supprimer le dossier de configuration (~/.config/wallpaper-smart)
+  --remove-wallpapers      Supprimer le dossier des templates de wallpapers (templates/...) dans --wallpapers-dir
+  --wallpapers-dir DIR     Dossier racine des wallpapers (identique à wallpaper_dir dans config.json)
+  -h, --help               Afficher l’aide
+```
 ---
 
 ## 🗺️ Roadmap
 
 - [x] Ajouter une section « À propos » dans l’interface
 - [x] Ajouter un bouton « Don »
-- [ ] Améliorer les logs (interface plus lisible)
-- [ ] Gestion avancée des thèmes (aperçu + import/export)
+- [x] Améliorer les logs (interface plus lisible)
 - [x] Support de KDE Plasma
 - [x] Météo en temps réel pour les localisations prédéfinies
-- [ ] Ajouter la gestion multilingue
+- [x] Ajouter la gestion multilingue
 - [x] Détecter la géolocalisation à l’installation pour définir la latitude/longitude par défaut (opetion désactivable)
 - [x] Section géolocalisation : en mode « Ville », récupérer la latitude/longitude à partir de la ville saisie
 - [ ] Permettre la gestion des thèmes sombre et clair pour les fonds d’écran
-
+- [ ] Gestion avancée des thèmes (aperçu + import/export)
 
 ---
 
@@ -313,9 +345,6 @@ chmod +x uninstall.sh
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 ```
 
-### Est-ce compatible KDE ?
-Oui. Wallpaper Smart supporte GNOME et KDE Plasma.
-
 ---
 
 ## 🛡️ Licence
@@ -324,6 +353,14 @@ MIT License © SpiderDev
 Voir le fichier [LICENSE](LICENSE).
 
 ---
+
+## ❤️ Soutenir le projet
+
+Si Wallpaper Smart vous aide au quotidien, vous pouvez soutenir le projet :
+
+- PayPal : https://www.paypal.com/paypalme/lalsarok1
+- Buy Me a Coffee : https://buymeacoffee.com/spiderdev
+- Site : https://spiderdev.fr
 
 ## 🤝 Contribuer
 

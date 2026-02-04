@@ -21,29 +21,9 @@ import socket
 import gettext
 import locale
 
-_tr = None
-
-def init_i18n(lang_code: str) -> None:
-    global _tr
-
-    if not lang_code or lang_code == "system":
-        lang_code = (os.environ.get("LANG") or "en_US").split(".")[0]
-
-    try:
-        locale.setlocale(locale.LC_ALL, "")
-    except Exception:
-        pass
-
-    try:
-        _tr = gettext.translation(APP_ID, localedir=LOCALES_DIR, languages=[lang_code], fallback=True)
-    except Exception:
-        _tr = gettext.NullTranslations()
 
 def _(s: str) -> str:
-    try:
-        return _tr.gettext(s) if _tr else s
-    except Exception:
-        return s
+    return s
 
 
 
@@ -54,10 +34,10 @@ SERVICE = "wallpaper-smart.service"
 TIMER = "wallpaper-smart.timer"
 
 MOMENTS: List[Tuple[str, str]] = [
-    ("aube", _("Aube")),
-    ("midi", _("Midi")),
-    ("coucher", _("Coucher")),
-    ("nuit", _("Nuit")),
+    ("aube", _("moment-aube")),
+    ("midi", _("moment-midi")),
+    ("coucher", _("moment-coucher")),
+    ("nuit", _("moment-nuit")),
 ]
 
 WEATHER_KEYS_ORDER = ["clear", "cloudy", "fog", "rain", "snow", "thunder"]
@@ -87,12 +67,6 @@ DEFAULT_CFG = {
 APP_ID = "wallpaper-smart"
 APP_VERSION = "1.0.0"
 LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
-
-LANG_CHOICES = [
-    ("system", _("Systeme")),
-    ("fr_FR", _("Francais")),
-    ("en_US", _("English")),
-]
 
 
 # Presets de géolocalisation (simulation météo)
@@ -237,6 +211,80 @@ GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
     "jp_tokyo": ("🇯🇵 Tokyo", (35.6762, 139.6503)),
 }
 
+APP_LANG_DEFAULT = "en_US"
+_tr = {}
+_tr_fallback = {}
+
+def _detect_system_lang() -> str:
+    # Try LANG=fr_FR.UTF-8 -> fr_FR
+    try:
+        lang = os.environ.get("LANG", "") or ""
+        if "." in lang:
+            lang = lang.split(".", 1)[0]
+        if lang:
+            return lang
+    except Exception:
+        pass
+
+    # Fallback locale module
+    try:
+        loc = locale.getdefaultlocale()[0]
+        if loc:
+            return loc
+    except Exception:
+        pass
+
+    return APP_LANG_DEFAULT
+
+
+def _load_lang_file(lang_dir: Path, code: str) -> dict:
+    p = lang_dir / f"{code}.json"
+    try:
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def init_i18n_json(cfg: dict, lang_dir: Path | None = None) -> None:
+    global _tr, _tr_fallback
+
+    custom = APP_DIR / "lang"
+    if custom.exists():
+        lang_dir = custom
+
+    ui = cfg.get("ui", {}) if isinstance(cfg.get("ui", {}), dict) else {}
+    lang = str(ui.get("language", "system") or "system").strip()
+
+    if not lang_dir:
+        # lang folder next to this script
+        here = Path(__file__).resolve().parent
+        lang_dir = here / "lang"
+
+    if lang == "system" or not lang:
+        lang = _detect_system_lang()
+
+    # Load fallback first
+    _tr_fallback = _load_lang_file(lang_dir, APP_LANG_DEFAULT)
+
+    # Load selected lang
+    _tr = _load_lang_file(lang_dir, lang)
+
+    # If selected file not found, keep fallback
+    if not _tr:
+        _tr = dict(_tr_fallback)
+
+
+def _(key: str) -> str:
+    try:
+        if key in _tr:
+            return str(_tr[key])
+        if key in _tr_fallback:
+            return str(_tr_fallback[key])
+        return key
+    except Exception:
+        return key
 
 def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
     url = (
@@ -1077,11 +1125,10 @@ class App(Gtk.Window):
         self.set_default_size(1020, 720)
         self.set_resizable(True)
 
-        self.cfg = load_cfg()
 
-        ui = self.cfg.get("ui", {}) if isinstance(self.cfg.get("ui", {}), dict) else {}
-        self.ui_language = ui.get("language", "system")
-        init_i18n(self.ui_language)
+        self.cfg = load_cfg()
+        init_i18n_json(self.cfg)
+
 
         self.wallpaper_themes = load_wallpaper_themes(self.cfg.get("wallpaper_dir", ""))
 
@@ -1098,7 +1145,7 @@ class App(Gtk.Window):
         title = Gtk.Label(label="Wallpaper Smart", xalign=0)
         title.get_style_context().add_class("header-title")
 
-        sub = Gtk.Label(label=_("Fond d’écran dynamique • heure + météo"), xalign=0)
+        sub = Gtk.Label(label=_("title-app"), xalign=0)
         sub.get_style_context().add_class("header-sub")
 
         header.pack_start(title, False, False, 0)
@@ -1109,20 +1156,20 @@ class App(Gtk.Window):
         self.nb = Gtk.Notebook()
         root.pack_start(self.nb, True, True, 0)
 
-        self.nb.append_page(self.build_tab_general(), make_tab_label(_("Général"), "preferences-system-symbolic"))
-        self.nb.append_page(self.build_tab_time(),    make_tab_label(_("Horaires"),    "alarm-symbolic"))
+        self.nb.append_page(self.build_tab_general(), make_tab_label(_("ui.menu-setting"), "preferences-system-symbolic"))
+        self.nb.append_page(self.build_tab_time(),    make_tab_label(_("ui.menu-time"),    "alarm-symbolic"))
         
-        self.nb.append_page(self.build_tab_geoloc(),  make_tab_label(_("Localisation"),   "mark-location-symbolic"))
+        self.nb.append_page(self.build_tab_geoloc(),  make_tab_label(_("ui.menu-geoloc"),   "mark-location-symbolic"))
         self.refresh_preset_icons_async()
 
-        self.nb.append_page(self.build_tab_mapping(), make_tab_label(_("Mapping"), "view-list-symbolic"))
+        self.nb.append_page(self.build_tab_mapping(), make_tab_label(_("ui.menu-mapping"), "view-list-symbolic"))
 
         # Images: garder une référence pour rebuild safe
         self.images_tab = self.build_tab_images()
-        self.nb.append_page(self.images_tab, make_tab_label(_("Images"), "image-x-generic-symbolic"))
+        self.nb.append_page(self.images_tab, make_tab_label(_("ui.menu-images"), "image-x-generic-symbolic"))
 
         # btn tab About
-        self.nb.append_page(self.build_tab_about(), make_tab_label(_("A propos"), "help-about-symbolic"))
+        self.nb.append_page(self.build_tab_about(), make_tab_label(_("ui.menu-about"), "help-about-symbolic"))
 
 
         # Action bar
@@ -1130,15 +1177,15 @@ class App(Gtk.Window):
         bar.get_style_context().add_class("actionbar")
         root.pack_end(bar, False, False, 0)
 
-        btn_save = Gtk.Button(label=_("Enregistrer"))
+        btn_save = Gtk.Button(label=_("btn.save"))
         btn_save.get_style_context().add_class("accent")
         btn_save.connect("clicked", self.on_save)
 
-        btn_test = Gtk.Button(label=_("Tester maintenant"))
+        btn_test = Gtk.Button(label=_("btn.test"))
         btn_test.get_style_context().add_class("warn")
         btn_test.connect("clicked", self.on_test)
 
-        btn_logs = Gtk.Button(label=_("Voir logs"))
+        btn_logs = Gtk.Button(label=_("btn.logs"))
         btn_logs.connect("clicked", self.on_logs)
         
 
@@ -1360,10 +1407,10 @@ class App(Gtk.Window):
         self.folder_entry = Gtk.Entry()
         self.folder_entry.set_text(self.cfg["wallpaper_dir"])
 
-        btn_choose = Gtk.Button(label="Choisir…")
+        btn_choose = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-choose"))
         btn_choose.connect("clicked", self.on_choose_folder)
 
-        btn_open = Gtk.Button(label="Ouvrir")
+        btn_open = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-open"))
         btn_open.connect("clicked", self.on_open_folder)
 
         row.pack_start(self.folder_entry, True, True, 0)
@@ -1371,7 +1418,7 @@ class App(Gtk.Window):
         row.pack_start(btn_open, False, False, 0)
 
         help_lbl = Gtk.Label(
-            label="Base: templates/<theme>/base/{aube,midi,coucher,nuit}.png • Meteo: templates/<theme>/meteo/<prefix>_<moment>.png",
+            label=_("tab.setting.wallpaper-card.lbl-wallpaper"),
             xalign=0
         )
         help_lbl.set_line_wrap(True)
@@ -1380,7 +1427,7 @@ class App(Gtk.Window):
         content.pack_start(row, False, False, 0)
         content.pack_start(help_lbl, False, False, 0)
 
-        page.pack_start(make_card("Dossier wallpapers", content), False, False, 0)
+        page.pack_start(make_card("tab.setting.wallpaper-card.title", content), False, False, 0)
 
         # Refresh dashboard once UI is built
         self.refresh_dashboard()
@@ -1390,21 +1437,25 @@ class App(Gtk.Window):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
         # Label
-        lbl = Gtk.Label(label=_("Choisir la langue"), xalign=0)
+        lbl = Gtk.Label(label=_("tab.setting.lang-card.lbl-langue"), xalign=0)
         lbl.get_style_context().add_class("muted")
         content.pack_start(lbl, False, False, 0)
 
         # Combo
         self.lang_combo = Gtk.ComboBoxText()
-        self.lang_combo.append("system", _("Systeme"))
-        self.lang_combo.append("fr_FR", _("Francais"))
-        self.lang_combo.append("en_US", _("English"))
+        self.lang_combo.append("fr_FR", "🇫🇷 " + _("tab.setting.lang-card.lbl-fang-fr"))
+        self.lang_combo.append("en_US", "🇬🇧 " + _("tab.setting.lang-card.lbl-fang-en"))
+        self.lang_combo.append("de_DE", "🇩🇪 " + _("tab.setting.lang-card.lbl-fang-de"))
+        self.lang_combo.append("sp_SP", "🇪🇸 " + _("tab.setting.lang-card.lbl-fang-sp"))
+        self.lang_combo.append("ar_AR", "🇸🇦 " + _("tab.setting.lang-card.lbl-fang-ar"))
+        self.lang_combo.append("cn_CN", "🇨🇳 " + _("tab.setting.lang-card.lbl-fang-cn"))
+        self.lang_combo.append("ru_RU", "🇷🇺 " + _("tab.setting.lang-card.lbl-fang-ru"))
 
         ui = self.cfg.get("ui", {}) if isinstance(self.cfg.get("ui", {}), dict) else {}
         cur_lang = ui.get("language", "system")
 
-        if cur_lang not in ["system", "fr_FR", "en_US"]:
-            cur_lang = "system"
+        if cur_lang not in ["fr_FR", "en_US", "de_DE", "sp_SP", "ar_AR", "cn_CN", "ru_RU"]:
+            cur_lang = "en_US"
 
         self.lang_combo.set_active_id(cur_lang)
         self.lang_combo.connect("changed", self.on_language_changed)
@@ -1413,27 +1464,23 @@ class App(Gtk.Window):
 
         # Hint
         hint = Gtk.Label(
-            label=_("Le changement de langue necessite un redemarrage de l'application."),
+            label=_("tab.setting.lang-card.lbl-info"),
             xalign=0
         )
         hint.set_line_wrap(True)
         hint.get_style_context().add_class("muted")
         content.pack_start(hint, False, False, 0)
 
-        return make_card(_("Langue"), content)
+        return make_card(_("tab.setting.lang-card.title"), content)
 
 
     def on_language_changed(self, _combo):
-        try:
-            lang = self.lang_combo.get_active_id() or "system"
-        except Exception:
-            lang = "system"
-
-        if "ui" not in self.cfg or not isinstance(self.cfg.get("ui"), dict):
-            self.cfg["ui"] = {}
-
+        lang = self.lang_combo.get_active_id() or "system"
+        self.cfg.setdefault("ui", {})
         self.cfg["ui"]["language"] = lang
-        print(f"[ui] language set to: {lang}", flush=True)
+        save_cfg(self.cfg)   # ton save existant
+        # Optional: show a muted hint label "Restart app to apply"
+
         
 
     def build_wallpaper_theme_card(self) -> Gtk.Widget:
@@ -1441,7 +1488,7 @@ class App(Gtk.Window):
 
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
-        lab = Gtk.Label(label=_("Theme"), xalign=0)
+        lab = Gtk.Label(label=_("tab.setting.theme-card.lbl-theme"), xalign=0)
         lab.get_style_context().add_class("muted")
         row.pack_start(lab, False, False, 0)
 
@@ -1464,14 +1511,14 @@ class App(Gtk.Window):
         box.pack_start(row, False, False, 0)
 
         help_lbl = Gtk.Label(
-            label=_("Choisit un theme de wallpapers (section UI seulement pour le moment)."),
+            label=_("tab.setting.theme-card.legend"),
             xalign=0
         )
         help_lbl.set_line_wrap(True)
         help_lbl.get_style_context().add_class("muted")
         box.pack_start(help_lbl, False, False, 0)
 
-        return make_card(_("Theme wallpapers"), box)
+        return make_card(_("tab.setting.theme-card.title"), box)
     
 
     def on_wall_theme_changed(self, _combo):
@@ -1484,11 +1531,11 @@ class App(Gtk.Window):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
         top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        title = Gtk.Label(label=_("État"), xalign=0)
+        title = Gtk.Label(label=_("tab.setting.dashboard-card.state"), xalign=0)
         title.get_style_context().add_class("card-title")
         top.pack_start(title, True, True, 0)
 
-        btn_refresh = Gtk.Button(label=_("Rafraîchir"))
+        btn_refresh = Gtk.Button(label=_("tab.setting.dashboard-card.btn-refresh"))
         btn_refresh.connect("clicked", lambda _b: self.refresh_dashboard())
         top.pack_end(btn_refresh, False, False, 0)
         box.pack_start(top, False, False, 0)
@@ -1514,20 +1561,21 @@ class App(Gtk.Window):
         self.dash_wall = Gtk.Label(label="—", xalign=0)
         self.dash_wall.set_line_wrap(True)
 
-        row(0, _("Timer"), self.dash_timer)
-        row(1, _("Moment / heure"), self.dash_moment)
-        row(2, _("Météo"), self.dash_meteo)
-        row(3, _("Localisation"), self.dash_loc)
-        row(4, _("Dernier fond"), self.dash_wall)
+        row(0, _("tab.setting.dashboard-card.lbl-timer"), self.dash_timer)
+        row(1, _("tab.setting.dashboard-card.lbl-moment"), self.dash_moment)
+        row(2, _("tab.setting.dashboard-card.lbl-meteo"), self.dash_meteo)
+        row(3, _("tab.setting.dashboard-card.lbl-localisation"), self.dash_loc)
+        row(4, _("tab.setting.dashboard-card.lbl-lastback"), self.dash_wall)
         hint = Gtk.Label(
-            label=_("Astuce : \"Tester maintenant\" applique une config temporaire (sans enregistrer)."),
+            label=_("tab.setting.dashboard-card.lbl-tips"),
             xalign=0
         )
         hint.set_line_wrap(True)
         hint.get_style_context().add_class("muted")
         box.pack_start(hint, False, False, 0)
 
-        return make_card(_("Dashboard"), box)
+        return make_card(_("tab.setting.dashboard-card.title"), box)
+
     def _set_chip(self, w: Gtk.Label, ok: bool, text: str):
         ctx = w.get_style_context()
         # Remove previous state classes
@@ -1541,7 +1589,7 @@ class App(Gtk.Window):
         try:
             # Timer status
             active = is_timer_active()
-            self._set_chip(self.dash_timer, active, _("Actif") if active else _("Désactivé"))
+            self._set_chip(self.dash_timer, active, _("tab.setting.dashboard-card.state-on") if active else _("tab.setting.dashboard-card.state-off"))
 
             # Moment (from schedule)
             import datetime
@@ -1724,10 +1772,10 @@ class App(Gtk.Window):
         self.spin_coucher = spin(sch["coucher_start"])
 
         rows = [
-            (_("Nuit start"), self.spin_nuit),
-            (_("Aube start"), self.spin_aube),
-            (_("Midi start"), self.spin_midi),
-            (_("Coucher start"), self.spin_coucher),
+            (_("tab.schedules.card-shedules.lbl.start-aube"), self.spin_aube),
+            (_("tab.schedules.card-shedules.lbl.start-midi"), self.spin_midi),
+            (_("tab.schedules.card-shedules.lbl.start-coucher"), self.spin_coucher),
+            (_("tab.schedules.card-shedules.lbl.start-night"), self.spin_nuit)
         ]
         for i, (t, w) in enumerate(rows):
             grid.attach(Gtk.Label(label=t, xalign=0), 0, i, 1, 1)
@@ -1737,13 +1785,13 @@ class App(Gtk.Window):
         self.spin_minutes = Gtk.SpinButton.new_with_range(1, 240, 1)
         self.spin_minutes.set_value(int(self.cfg.get("timer_minutes", 10)))
 
-        lbl = Gtk.Label(label=_("Toutes les (minutes) :"), xalign=0)
+        lbl = Gtk.Label(label=_("tab.schedules.card-frequency.lbl"), xalign=0)
         lbl.get_style_context().add_class("muted")
         row2.pack_start(lbl, False, False, 0)
         row2.pack_start(self.spin_minutes, False, False, 0)
 
-        box.pack_start(make_card(_("Horaires"), grid), False, False, 0)
-        box.pack_start(make_card(_("Fréquence"), row2), False, False, 0)
+        box.pack_start(make_card(_("tab.schedules.card-shedules.title"), grid), False, False, 0)
+        box.pack_start(make_card(_("tab.schedules.card-frequency.title"), row2), False, False, 0)
 
         return make_page(box)
 
@@ -1761,8 +1809,8 @@ class App(Gtk.Window):
             cur_mode = "auto_ip"
 
         self.geo_combo = Gtk.ComboBoxText()
-        self.geo_combo.append("auto_ip", "Geolocalisation")
-        self.geo_combo.append("fixed", "Fixe")
+        self.geo_combo.append("auto_ip", _("tab.location.card-geoloc.lbl-select-mode-geoloc"))
+        self.geo_combo.append("fixed", _("tab.location.card-geoloc.lbl-select-mode-fixed"))
         # self.geo_combo.append("city", "Ville")
 
         current_mode = self.cfg.get("geolocation", {}).get("mode", "auto_ip")
@@ -1771,21 +1819,21 @@ class App(Gtk.Window):
 
         self.geo_combo.set_active_id(current_mode)
 
-        mode_lbl = Gtk.Label(label=_("Mode"), xalign=0)
+        mode_lbl = Gtk.Label(label=_("tab.location.card-geoloc.lbl-mode"), xalign=0)
         mode_lbl.get_style_context().add_class("muted")
         content.pack_start(mode_lbl, False, False, 0)
         content.pack_start(self.geo_combo, False, False, 0)
 
         self.geo_combo.connect("changed", self.on_geo_mode_changed)
 
-        preset_lbl = Gtk.Label(label=_("Preset (simulation)"), xalign=0)
+        preset_lbl = Gtk.Label(label=_("tab.location.card-geoloc.lbl-preset"), xalign=0)
         preset_lbl.get_style_context().add_class("muted")
 
         # Model: id, label, icon, lat, lon
         self.preset_store = Gtk.ListStore(str, str, str, float, float)
 
         # Optional: add a "none" row
-        self.preset_store.append(["none", _("Aucun (saisie perso)"), "", 0.0, 0.0])
+        self.preset_store.append(["none", _("tab.location.card-geoloc.lbl-select-preset-empty"), "", 0.0, 0.0])
 
         for pid, (label, coords) in GEO_PRESETS.items():
             if pid == "none" or not coords:
@@ -1851,12 +1899,12 @@ class App(Gtk.Window):
         self.city_entry.set_text(self.cfg.get("geolocation", {}).get("city_name", "Strasbourg"))
 
         g = Gtk.Grid(column_spacing=10, row_spacing=8)
-        g.attach(Gtk.Label(label=_("Latitude"), xalign=0), 0, 0, 1, 1)
+        g.attach(Gtk.Label(label=_("tab.location.card-geoloc.lbl-lat"), xalign=0), 0, 0, 1, 1)
         g.attach(self.lat_entry, 1, 0, 1, 1)
-        g.attach(Gtk.Label(label=_("Longitude"), xalign=0), 0, 1, 1, 1)
+        g.attach(Gtk.Label(label=_("tab.location.card-geoloc.lbl-lon"), xalign=0), 0, 1, 1, 1)
         g.attach(self.lon_entry, 1, 1, 1, 1)
 
-        g.attach(Gtk.Label(label=_("Ville"), xalign=0), 0, 2, 1, 1)
+        g.attach(Gtk.Label(label=_("tab.location.card-geoloc.lbl-city"), xalign=0), 0, 2, 1, 1)
 
         city_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 
@@ -1866,13 +1914,13 @@ class App(Gtk.Window):
 
         # Button: clear city
         self.btn_city_clear = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
-        self.btn_city_clear.set_tooltip_text(_("Vider"))
+        self.btn_city_clear.set_tooltip_text(_("tab.location.card-geoloc.btn-search"))
         self.btn_city_clear.connect("clicked", self.on_city_clear_clicked)
         city_row.pack_start(self.btn_city_clear, False, False, 0)
 
         # Button: geocode city -> lat/lon
         self.btn_city_search = Gtk.Button.new_from_icon_name("system-search-symbolic", Gtk.IconSize.BUTTON)
-        self.btn_city_search.set_tooltip_text(_("Rechercher lat/lon"))
+        self.btn_city_search.set_tooltip_text(_("tab.location.card-geoloc.btn-search"))
         self.btn_city_search.connect("clicked", self.on_city_search_clicked)
         city_row.pack_start(self.btn_city_search, False, False, 0)
 
@@ -1883,7 +1931,7 @@ class App(Gtk.Window):
         content.pack_start(g, False, False, 0)
 
         hint = Gtk.Label(
-            label=_("Astuce: la géolocalisation utilise OpenStreetMap (Nominatim). A utiliser pour config, pas en polling intensif."),
+            label=_("tab.location.card-geoloc.lbl-tips"),
             xalign=0
         )
         hint.set_line_wrap(True)
@@ -1892,7 +1940,7 @@ class App(Gtk.Window):
 
         # self.refresh_geoloc_controls()
 
-        box.pack_start(make_card(_("Geolocalisation"), content), False, False, 0)
+        box.pack_start(make_card(_("tab.location.card-geoloc.title"), content), False, False, 0)
         self.refresh_dashboard()
         return make_page(box)
 
@@ -1911,14 +1959,14 @@ class App(Gtk.Window):
             grid.attach(Gtk.Label(label=key, xalign=0), 0, i, 1, 1)
             grid.attach(e, 1, i, 1, 1)
 
-        hint = Gtk.Label(label=_("Ex: rain=pluie → fichiers attendus: meteo/pluie_aube.png, meteo/pluie_midi.png, ..."), xalign=0)
+        hint = Gtk.Label(label=_("tab.mapping.card-mapping.lbl-tips"), xalign=0)
         hint.set_line_wrap(True)
         hint.get_style_context().add_class("muted")
 
         content.pack_start(grid, False, False, 0)
         content.pack_start(hint, False, False, 0)
 
-        return make_page(make_card(_("Mapping météo → préfixes"), content))
+        return make_page(make_card(_("tab.mapping.card-mapping.title"), content))
 
 
     def build_tab_images(self):
@@ -1926,23 +1974,23 @@ class App(Gtk.Window):
 
         top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
-        btn_refresh = Gtk.Button(label=_("Rafraîchir"))
+        btn_refresh = Gtk.Button(label=_("tab.images.card-action.btn-refresh"))
         btn_refresh.connect("clicked", lambda _b: self.refresh_images_preview())
         top.pack_start(btn_refresh, False, False, 0)
 
-        btn_placeholders = Gtk.Button(label=_("Créer placeholders"))
+        btn_placeholders = Gtk.Button(label=_("tab.images.card-action.btn-create-placeholder"))
         btn_placeholders.connect("clicked", self.on_create_placeholders)
         top.pack_start(btn_placeholders, False, False, 0)
 
-        btn_open_base = Gtk.Button(label=_("Ouvrir base/"))
+        btn_open_base = Gtk.Button(label=_("tab.images.card-action.btn-open-base"))
         btn_open_base.connect("clicked", lambda _b: self._open_subdir("base", themed=True))
         top.pack_start(btn_open_base, False, False, 0)
 
-        btn_open_meteo = Gtk.Button(label=_("Ouvrir meteo/"))
+        btn_open_meteo = Gtk.Button(label=_("tab.images.card-action.btn-open-weather"))
         btn_open_meteo.connect("clicked", lambda _b: self._open_subdir("meteo", themed=True))
         top.pack_start(btn_open_meteo, False, False, 0)
 
-        page.pack_start(make_card(_("Actions"), top), False, False, 0)
+        page.pack_start(make_card(_("tab.images.card-action.title"), top), False, False, 0)
 
         # Split view 50/50 (modifiable ensuite en glissant)
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -2028,7 +2076,7 @@ class App(Gtk.Window):
         title.get_style_context().add_class("card-title")
 
         subtitle = Gtk.Label(
-            label=_("Fond d'ecran dynamique (heure + meteo) - GNOME / KDE"),
+            label=_("tab.about.card-about.label"),
             xalign=0
         )
         subtitle.get_style_context().add_class("muted")
@@ -2045,11 +2093,11 @@ class App(Gtk.Window):
         # Badges row (chips)
         chips = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
-        chip_version = Gtk.Label(label=f"{_("Version")} {app_version}")
+        chip_version = Gtk.Label(label=f"{_("tab.about.card-about.label-version")} {app_version}")
         chip_version.get_style_context().add_class("chip")
         chip_version.get_style_context().add_class("chip-ok")
 
-        chip_license = Gtk.Label(label=_("Licence MIT"))
+        chip_license = Gtk.Label(label= _("tab.about.card-about.label-licence"))
         chip_license.get_style_context().add_class("chip")
         chip_license.get_style_context().add_class("chip-ok")
 
@@ -2067,7 +2115,7 @@ class App(Gtk.Window):
         # Author line with clickable link
         author_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
-        author_lbl = Gtk.Label(label=_("Auteur:"), xalign=0)
+        author_lbl = Gtk.Label(label=_("tab.about.card-about.label-autor") + ":", xalign=0)
         author_lbl.get_style_context().add_class("muted")
 
         author_link = Gtk.LinkButton.new_with_label("https://spiderdev.fr", "Spiderdev")
@@ -2081,8 +2129,7 @@ class App(Gtk.Window):
         # Short description card text
         desc = Gtk.Label(
             label=(
-                _("Wallpaper Smart change automatiquement votre fond d'ecran selon l'heure " \
-                "et la meteo locale. Vous pouvez aussi definir des images meteo par theme.")
+                _("tab.about.card-about.label-info")
             ),
             xalign=0
         )
@@ -2093,12 +2140,12 @@ class App(Gtk.Window):
         # Donations card (more visible)
         donate = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
-        donate_title = Gtk.Label(label=_("Soutenir le projet"), xalign=0)
+        donate_title = Gtk.Label(label=_("tab.about.card-donate.label-title"), xalign=0)
         donate_title.get_style_context().add_class("card-title")
         donate.pack_start(donate_title, False, False, 0)
 
         donate_txt = Gtk.Label(
-            label=_("Si l'app vous aide, un petit don permet de financer le temps de dev et les evolutions."),
+            label=_("tab.about.card-donate.label-title-desc"),
             xalign=0
         )
         donate_txt.set_line_wrap(True)
@@ -2124,8 +2171,8 @@ class App(Gtk.Window):
         donate.pack_start(donate_buttons, False, False, 0)
 
         # Assemble cards
-        box.pack_start(make_card(_("A propos"), content), False, False, 0)
-        box.pack_start(make_card(_("Dons"), donate), False, False, 0)
+        box.pack_start(make_card(_("tab.about.card-about.title"), content), False, False, 0)
+        box.pack_start(make_card(_("tab.about.card-donate.title"), donate), False, False, 0)
 
         return make_page(box)
 
@@ -2160,7 +2207,7 @@ class App(Gtk.Window):
     def _set_meteo_title(self, moment_key: str):
         moment_label = dict(MOMENTS).get(moment_key, moment_key)
         if getattr(self, "meteo_title_label", None):
-            self.meteo_title_label.set_text(f"Météo — {moment_label}")
+            self.meteo_title_label.set_text(f"{_("tab.images.card-meteo.title")} — {moment_label}")
 
     def _select_base_moment(self, moment_key: str):
         """Select a base moment in the left list + apply filter on the right."""
@@ -2206,14 +2253,14 @@ class App(Gtk.Window):
             chip.get_style_context().add_class("chip-miss")
             header.pack_start(chip, False, False, 0)
 
-            current_chip = Gtk.Label(label=_("ACTUEL"))
+            current_chip = Gtk.Label(label=_("tab.images.card-base.state-used"))
             current_chip.get_style_context().add_class("chip")
             current_chip.get_style_context().add_class("chip-ok")
             current_chip.set_no_show_all(True)
             current_chip.hide()
             header.pack_start(current_chip, False, False, 0)
 
-            btn_pick = Gtk.Button(label=_("Choisir…"))
+            btn_pick = Gtk.Button(label=_("tab.images.card-base.btn-choose"))
             btn_pick.connect("clicked", self.on_pick_image, self._rel_path("base", f"{moment_key}.png"))
             header.pack_end(btn_pick, False, False, 0)
 
@@ -2267,7 +2314,7 @@ class App(Gtk.Window):
             chip.get_style_context().add_class("chip-miss")
             header.pack_start(chip, False, False, 0)
 
-            active_lbl = Gtk.Label(label=_("Actif"), xalign=0)
+            active_lbl = Gtk.Label(label=_("tab.setting.dashboard-card.state-on"), xalign=0)
             active_lbl.get_style_context().add_class("muted")
 
             active_sw = Gtk.Switch()
@@ -2279,7 +2326,7 @@ class App(Gtk.Window):
             header.pack_start(active_lbl, False, False, 0)
             header.pack_start(active_sw, False, False, 0)
 
-            btn_pick = Gtk.Button(label=_("Choisir…"))
+            btn_pick = Gtk.Button(label=_("tab.images.card-meteo.btn-choose"))
             btn_pick.connect("clicked", self.on_pick_image, rel)
             header.pack_end(btn_pick, False, False, 0)
 
@@ -2391,7 +2438,7 @@ class App(Gtk.Window):
                 active_cb.set_sensitive(False)
             header.pack_start(active_cb, False, False, 0)
 
-            btn_pick = Gtk.Button(label=_("Choisir…"))
+            btn_pick = Gtk.Button(label=_("tab.images.card-base.btn-choose"))
             btn_pick.connect("clicked", self.on_pick_image, rel)
             header.pack_end(btn_pick, False, False, 0)
 
@@ -2441,7 +2488,7 @@ class App(Gtk.Window):
             self.message("Erreur", f"{_('Impossible de reconstruire l\'onglet Images')}\n{e}")
 
     def refresh_toggle_label(self):
-        self.btn_toggle.set_label(_("Désactiver") if is_timer_active() else _("Activer"))
+        self.btn_toggle.set_label(_("btn.tolggle.off") if is_timer_active() else _("btn.tolggle.on"))
 
     def message(self, title, text):
         dlg = Gtk.MessageDialog(self, 0, Gtk.MessageType.INFO, Gtk.ButtonsType.OK, title)
@@ -2781,7 +2828,7 @@ class App(Gtk.Window):
                 p = root / rel 
                 exists = p.exists()
 
-                path_lbl.set_text(str(p) if exists else f"{p} ({_('manquant')})")
+                path_lbl.set_text(str(p) if exists else f"{p} ({_('tab.images.card-meteo.state-nofound-low')})")
                 pb = load_pixbuf_scaled(p) if exists else None
                 if pb:
                     img_widget.set_from_pixbuf(pb)
@@ -2795,7 +2842,7 @@ class App(Gtk.Window):
                     chip_lbl.set_text("OK")
                     ctx.add_class("chip-ok")
                 else:
-                    chip_lbl.set_text("MANQUANT")
+                    chip_lbl.set_text(_("tab.images.card-meteo.state-nofound-upper"))
                     ctx.add_class("chip-miss")
 
                 if current_chip is not None:
@@ -3044,6 +3091,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
