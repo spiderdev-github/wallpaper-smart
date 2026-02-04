@@ -184,7 +184,7 @@ chmod +x install.sh
 
 ## ⚙️ Configuration
 
-Config file:
+Config file :
 
 ```bash
 ~/.config/wallpaper-smart/config.json
