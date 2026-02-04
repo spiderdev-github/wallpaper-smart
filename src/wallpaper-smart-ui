@@ -1959,7 +1959,7 @@ class App(Gtk.Window):
 
         # Button: clear city
         self.btn_city_clear = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
-        self.btn_city_clear.set_tooltip_text(_("tab.location.card-geoloc.btn-clear"))
+        self.btn_city_clear.set_tooltip_text(_("tab.location.card-geoloc.btn-empty"))
         self.btn_city_clear.connect("clicked", self.on_city_clear_clicked)
         set_hand_cursor_on_hover(self.btn_city_clear)
         city_row.pack_start(self.btn_city_clear, False, False, 0)

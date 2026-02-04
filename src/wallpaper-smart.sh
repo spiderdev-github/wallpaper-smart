@@ -238,6 +238,44 @@ if [[ ! -f "$CHOSEN" ]]; then
   fi
 fi
 
+# -----------------------------
+# Skip if same as current (state json)
+# -----------------------------
+STATE_JSON="$WALLDIR/current.json"
+
+
+# Rel path of the chosen wallpaper (relative to WALLDIR)
+REL_CHOSEN="${CHOSEN#"$WALLDIR/"}"
+
+# Read previous rel if exists
+PREV_REL=""
+if [[ -f "$STATE_JSON" ]]; then
+  PREV_REL="$(jq -r '.rel // ""' "$STATE_JSON" 2>/dev/null || true)"
+fi
+
+# If same rel and target already exists, do nothing
+if [[ -n "$PREV_REL" && "$PREV_REL" == "$REL_CHOSEN" && -f "$TARGET" ]]; then
+  log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+  log "==> Wallpaper unchanged, skip apply (rel=$REL_CHOSEN)"
+  exit 0
+fi
+
+# Write new state (even if apply may fail later, this avoids loops)
+jq -n \
+  --arg rel "$REL_CHOSEN" \
+  --arg abs "$CHOSEN" \
+  --arg moment "$MOMENT" \
+  --arg bucket "$WEATHER_BUCKET" \
+  --arg prefix "$PREFIX" \
+  --arg code "$CODE" \
+  --arg lat "$LAT" \
+  --arg lon "$LON" \
+  --arg ts "$(date -Is)" \
+  '{rel:$rel, abs:$abs, moment:$moment, bucket:$bucket, prefix:$prefix, code:$code, lat:$lat, lon:$lon, ts:$ts}' \
+  > "$STATE_JSON"
+
+
+
 cp -f "$CHOSEN" "$TARGET"
 
 # -----------------------------
