@@ -65,7 +65,7 @@ DEFAULT_CFG = {
 }
 
 APP_ID = "wallpaper-smart"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.0"
 LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
 
 
@@ -214,6 +214,34 @@ GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
 APP_LANG_DEFAULT = "en_US"
 _tr = {}
 _tr_fallback = {}
+
+def disable_scroll_change(widget):
+    """
+    Disable mouse wheel changing values on ComboBox/ComboBoxText.
+    Prevents accidental changes when user scrolls the window.
+    """
+    widget.connect("scroll-event", lambda _w, _e: True)
+
+def set_hand_cursor_on_hover(widget):
+    widget.add_events(Gdk.EventMask.ENTER_NOTIFY_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+
+    def on_enter(w, _e):
+        win = w.get_window()
+        if win:
+            win.set_cursor(Gdk.Cursor.new_from_name(Gdk.Display.get_default(), "pointer"))
+        return False
+
+    def on_leave(w, _e):
+        win = w.get_window()
+        if win:
+            win.set_cursor(None)
+        return False
+
+    widget.connect("enter-notify-event", on_enter)
+    widget.connect("leave-notify-event", on_leave)
+
+
+
 
 def _detect_system_lang() -> str:
     # Try LANG=fr_FR.UTF-8 -> fr_FR
@@ -480,163 +508,161 @@ def _auto_ip_details() -> Dict[str, str | float]:
 def apply_css(dark: bool):
     if dark:
         css = b"""
-            * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
+        * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
 
-            window { background: #2B2B2B; color: #EDEDED; }
+        window { background: #2B2B2B; color: #EDEDED; }
 
-            /* Header discret */
-            .header {
-            padding: 12px 14px;
-            background: #2B2B2B;
-            border: 0;
-            }
-            .header-title { font-size: 16px; font-weight: 800; color: #EDEDED; }
-            .header-sub { font-size: 12px; color: rgba(237,237,237,0.60); }
+        /* Header discret */
+        .header {
+        padding: 12px 14px;
+        background: #2B2B2B;
+        border: 0;
+        }
+        .header-title { font-size: 16px; font-weight: 800; color: #EDEDED; }
+        .header-sub { font-size: 12px; color: rgba(237,237,237,0.60); }
 
-            /* Notebook type GNOME (soft) */
-            notebook { background: transparent; border: 0; }
-            notebook header { background: transparent; border: 0; }
-            notebook tab {
-            background: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.10);
-            border-radius: 10px;
-            padding: 6px 12px;
-            margin: 6px 6px 10px 0;
-            }
-            notebook tab:checked {
-            background: rgba(255,255,255,0.10);
-            border-color: rgba(255,255,255,0.14);
-            }
+        /* Notebook type GNOME (soft) */
+        notebook { background: transparent; border: 0; }
+        notebook header { background: transparent; border: 0; }
+        notebook tab {
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 10px;
+        padding: 6px 12px;
+        margin: 6px 6px 10px 0;
+        }
+        notebook tab:checked {
+        background: rgba(255,255,255,0.10);
+        border-color: rgba(255,255,255,0.14);
+        }
 
-            /* Pages */
-            .page { padding: 10px; }
+        /* Pages */
+        .page { padding: 10px; }
 
-            /* Cards (sombres, bord fin) */
-            .card {
-            background: #343434;
-            border: 1px solid rgba(255,255,255,0.10);
-            border-radius: 14px;
-            padding: 12px;
-            }
-            .card-title { font-size: 13px; font-weight: 800; color: #EDEDED; }
-            .muted { color: rgba(237,237,237,0.60); }
+        /* Cards (sombres, bord fin) */
+        .card {
+        background: #343434;
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 14px;
+        padding: 12px;
+        }
+        .card-title { font-size: 13px; font-weight: 800; color: #EDEDED; }
+        .muted { color: rgba(237,237,237,0.60); }
 
-            /* Inputs (text fields) */
-            entry, spinbutton entry {
-            background: rgba(255,255,255,0.06);
-            color: #EDEDED;
-            border: 1px solid rgba(255,255,255,0.14);
-            border-radius: 12px;
-            padding: 10px;
-            }
-            
-            /* Combobox (Mode / Preset) : style flat, pas de double bordure */
-            combobox {
-                background: transparent;
-                border: 0;
-            }
-            
-            /* La boite principale du combobox */
-            combobox box {
-                background: #4b4b4b;
-                color: #EDEDED;
-                border: 0;
-                border-radius: 999px;
-                padding: 10px 12px;
-                box-shadow: none;
-            }
-            
-            /* IMPORTANT : le combobox contient un button interne (fleche) -> on annule ton style global button */
-            combobox button {
+        /* Inputs (text fields) */
+        entry, spinbutton entry {
+        background: rgba(255,255,255,0.06);
+        color: #EDEDED;
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 12px;
+        padding: 10px;
+        }
+        
+        /* Combobox (Mode / Preset) : style flat, pas de double bordure */
+        combobox {
             background: transparent;
             border: 0;
+        }
+        
+        /* La boite principale du combobox */
+        combobox box {
+            background: #4b4b4b;
+            color: #EDEDED;
+            border: 0;
+            border-radius: 999px;
+            padding: 10px 12px;
             box-shadow: none;
-            padding: 0;
-            border-radius: 999px;
-            }
+        }
+        
+        /* IMPORTANT : le combobox contient un button interne (fleche) -> on annule ton style global button */
+        combobox button {
+        background: transparent;
+        border: 0;
+        box-shadow: none;
+        padding: 0;
+        border-radius: 999px;
+        }
 
-            /* Hover / Focus leger (optionnel) */
-            combobox box:hover {
-            background: rgba(255,255,255,0.10);
-            }
-            combobox:focus-within box {
+        /* Hover / Focus leger (optionnel) */
+        combobox box:hover {
+        background: rgba(255,255,255,0.10);
+        }
+        combobox:focus-within box {
+        background: rgba(255,255,255,0.12);
+        box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.55); /* petit focus accent */
+        }
+
+        /* Buttons neutres */
+        button {
+        background: rgba(255,255,255,0.06);
+        color: #EDEDED;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 999px;
+        padding: 8px 14px;
+        }
+        button:hover { background: rgba(255,255,255,0.10); }
+
+        /* Accent Ubuntu (orange) */
+        .accent {
+        background: #E95420;
+        border-color: transparent;
+        color: #FFFFFF;
+        font-weight: 800;
+        }
+        .accent:hover { background: #F06434; }
+
+        /* Secondaire */
+        .warn {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.14);
+        color: #EDEDED;
+        font-weight: 700;
+        }
+        .warn:hover { background: rgba(255,255,255,0.12); }
+
+        /* Chips */
+        .chip {
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid rgba(255,255,255,0.14);
+        }
+        .chip-ok {
+        background: rgba(46, 204, 113, 0.18);
+        color: #D9F8E6;
+        border-color: rgba(46, 204, 113, 0.28);
+        }
+        .chip-miss {
+        background: rgba(231, 76, 60, 0.18);
+        color: #FFE2DD;
+        border-color: rgba(231, 76, 60, 0.28);
+        }
+
+
+        /* Switch */
+        .ws-switch { margin-left: 4px; }
+
+        switch {
             background: rgba(255,255,255,0.12);
-            box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.55); /* petit focus accent */
-            }
-
-            /* Buttons neutres */
-            button {
-            background: rgba(255,255,255,0.06);
-            color: #EDEDED;
-            border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 999px;
-            padding: 8px 14px;
-            }
-            button:hover { background: rgba(255,255,255,0.10); }
-
-            /* Accent Ubuntu (orange) */
-            .accent {
-            background: #E95420;
-            border-color: transparent;
-            color: #FFFFFF;
-            font-weight: 800;
-            }
-            .accent:hover { background: #F06434; }
-
-            /* Secondaire */
-            .warn {
-            background: rgba(255,255,255,0.08);
             border: 1px solid rgba(255,255,255,0.14);
-            color: #EDEDED;
-            font-weight: 700;
-            }
-            .warn:hover { background: rgba(255,255,255,0.12); }
-
-            /* Chips */
-            .chip {
             border-radius: 999px;
-            padding: 2px 10px;
-            font-size: 12px;
-            font-weight: 700;
-            border: 1px solid rgba(255,255,255,0.14);
-            }
-            .chip-ok {
-            background: rgba(46, 204, 113, 0.18);
-            color: #D9F8E6;
-            border-color: rgba(46, 204, 113, 0.28);
-            }
-            .chip-miss {
-            background: rgba(231, 76, 60, 0.18);
-            color: #FFE2DD;
-            border-color: rgba(231, 76, 60, 0.28);
-            }
-
-
-            /* Switch */
-            .ws-switch { margin-left: 4px; }
-
-            switch {
-              background: rgba(255,255,255,0.12);
-              border: 1px solid rgba(255,255,255,0.14);
-              border-radius: 999px;
-              padding: 2px;
-              min-width: 46px;
-              min-height: 24px;
-            }
-            switch:checked {
-              background: rgba(233, 84, 32, 0.85);
-              border-color: rgba(233, 84, 32, 0.95);
-            }
-            switch slider {
-              background: #EDEDED;
-              border: 1px solid rgba(0,0,0,0.20);
-              border-radius: 50px;
-              min-width: 30px;
-              min-height: 20px;
-            }
-            switch:disabled { opacity: 0.5; }
-
-
+            padding: 2px;
+            min-width: 46px;
+            min-height: 24px;
+        }
+        switch:checked {
+            background: rgba(233, 84, 32, 0.85);
+            border-color: rgba(233, 84, 32, 0.95);
+        }
+        switch slider {
+            background: #EDEDED;
+            border: 1px solid rgba(0,0,0,0.20);
+            border-radius: 50px;
+            min-width: 30px;
+            min-height: 20px;
+        }
+        switch:disabled { opacity: 0.5; }
     
         /* Switch */
         .ws-switch { margin-left: 4px; }
@@ -697,6 +723,7 @@ def apply_css(dark: bool):
         outline: none;
         box-shadow: none;
         }
+
         """
     else:
         css = b"""
@@ -1092,11 +1119,10 @@ def make_card(title: str, content: Gtk.Widget):
     card.pack_start(content, True, True, 0)
     return card
 
-
 # ---------------- UI ----------------
 class App(Gtk.Window):
     def __init__(self):
-        super().__init__(title="Wallpaper Smart – Paramètres")
+        super().__init__(title=f"Wallpaper Smart v.{APP_VERSION}")
 
         self._dark = detect_dark_mode()
         apply_css(self._dark)
@@ -1142,10 +1168,10 @@ class App(Gtk.Window):
         header = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         header.get_style_context().add_class("header")
 
-        title = Gtk.Label(label="Wallpaper Smart", xalign=0)
+        title = Gtk.Label(label=f"Wallpaper Smart", xalign=0)
         title.get_style_context().add_class("header-title")
 
-        sub = Gtk.Label(label=_("title-app"), xalign=0)
+        sub = Gtk.Label(label=_("desc-app"), xalign=0)
         sub.get_style_context().add_class("header-sub")
 
         header.pack_start(title, False, False, 0)
@@ -1179,18 +1205,23 @@ class App(Gtk.Window):
 
         btn_save = Gtk.Button(label=_("btn.save"))
         btn_save.get_style_context().add_class("accent")
+        set_hand_cursor_on_hover(btn_save)
         btn_save.connect("clicked", self.on_save)
 
         btn_test = Gtk.Button(label=_("btn.test"))
         btn_test.get_style_context().add_class("warn")
+        set_hand_cursor_on_hover(btn_test)
         btn_test.connect("clicked", self.on_test)
 
         btn_logs = Gtk.Button(label=_("btn.logs"))
+        set_hand_cursor_on_hover(btn_logs)
         btn_logs.connect("clicked", self.on_logs)
         
 
 
         self.btn_toggle = Gtk.Button()
+        set_hand_cursor_on_hover(self.btn_toggle)
+
         self.btn_toggle.connect("clicked", self.on_toggle_timer)
         self.refresh_toggle_label()
 
@@ -1406,12 +1437,15 @@ class App(Gtk.Window):
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.folder_entry = Gtk.Entry()
         self.folder_entry.set_text(self.cfg["wallpaper_dir"])
+        self.folder_entry.set_sensitive(False)
 
         btn_choose = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-choose"))
         btn_choose.connect("clicked", self.on_choose_folder)
+        set_hand_cursor_on_hover(btn_choose)
 
         btn_open = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-open"))
         btn_open.connect("clicked", self.on_open_folder)
+        set_hand_cursor_on_hover(btn_open)
 
         row.pack_start(self.folder_entry, True, True, 0)
         row.pack_start(btn_choose, False, False, 0)
@@ -1427,7 +1461,7 @@ class App(Gtk.Window):
         content.pack_start(row, False, False, 0)
         content.pack_start(help_lbl, False, False, 0)
 
-        page.pack_start(make_card("tab.setting.wallpaper-card.title", content), False, False, 0)
+        page.pack_start(make_card(_("tab.setting.wallpaper-card.title"), content), False, False, 0)
 
         # Refresh dashboard once UI is built
         self.refresh_dashboard()
@@ -1459,6 +1493,7 @@ class App(Gtk.Window):
 
         self.lang_combo.set_active_id(cur_lang)
         self.lang_combo.connect("changed", self.on_language_changed)
+        disable_scroll_change(self.lang_combo)
 
         content.pack_start(self.lang_combo, False, False, 0)
 
@@ -1506,8 +1541,14 @@ class App(Gtk.Window):
         self.wall_theme_combo.set_active_id(current)
 
         self.wall_theme_combo.connect("changed", self.on_wall_theme_changed)
+        disable_scroll_change(self.wall_theme_combo)
+        #set_hand_cursor_on_hover(self.wall_theme_combo)
 
-        row.pack_start(self.wall_theme_combo, True, True, 0)
+        eb = Gtk.EventBox()
+        eb.add(self.wall_theme_combo)
+        set_hand_cursor_on_hover(eb)
+
+        row.pack_start(eb, True, True, 0)
         box.pack_start(row, False, False, 0)
 
         help_lbl = Gtk.Label(
@@ -1536,6 +1577,7 @@ class App(Gtk.Window):
         top.pack_start(title, True, True, 0)
 
         btn_refresh = Gtk.Button(label=_("tab.setting.dashboard-card.btn-refresh"))
+        set_hand_cursor_on_hover(btn_refresh)
         btn_refresh.connect("clicked", lambda _b: self.refresh_dashboard())
         top.pack_end(btn_refresh, False, False, 0)
         box.pack_start(top, False, False, 0)
@@ -1763,6 +1805,7 @@ class App(Gtk.Window):
         def spin(value):
             s = Gtk.SpinButton.new_with_range(0, 23, 1)
             s.set_value(int(value))
+            set_hand_cursor_on_hover(s)
             return s
 
         sch = self.cfg["schedule"]
@@ -1789,7 +1832,7 @@ class App(Gtk.Window):
         lbl.get_style_context().add_class("muted")
         row2.pack_start(lbl, False, False, 0)
         row2.pack_start(self.spin_minutes, False, False, 0)
-
+        set_hand_cursor_on_hover(self.spin_minutes)
         box.pack_start(make_card(_("tab.schedules.card-shedules.title"), grid), False, False, 0)
         box.pack_start(make_card(_("tab.schedules.card-frequency.title"), row2), False, False, 0)
 
@@ -1801,30 +1844,30 @@ class App(Gtk.Window):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
         self.geo_combo = Gtk.ComboBoxText()
-        for t in ["auto_ip", "fixed", "city"]:
-            self.geo_combo.append_text(t)
-
-        cur_mode = self.cfg.get("geolocation", {}).get("mode", "auto_ip")
-        if cur_mode not in ["auto_ip", "fixed", "city"]:
-            cur_mode = "auto_ip"
-
-        self.geo_combo = Gtk.ComboBoxText()
         self.geo_combo.append("auto_ip", _("tab.location.card-geoloc.lbl-select-mode-geoloc"))
         self.geo_combo.append("fixed", _("tab.location.card-geoloc.lbl-select-mode-fixed"))
         # self.geo_combo.append("city", "Ville")
 
         current_mode = self.cfg.get("geolocation", {}).get("mode", "auto_ip")
-        if current_mode not in ["auto_ip", "fixed", "city"]:
+        if current_mode not in ["auto_ip", "fixed"]:
             current_mode = "auto_ip"
 
         self.geo_combo.set_active_id(current_mode)
+        
+        geo_box = Gtk.EventBox()
+        geo_box.set_visible_window(False)  # pas de fond, mais garde une window pour le curseur
+        geo_box.add(self.geo_combo)
+        set_hand_cursor_on_hover(geo_box)  # <-- hover sur eventbox, pas sur la fenêtre        
 
         mode_lbl = Gtk.Label(label=_("tab.location.card-geoloc.lbl-mode"), xalign=0)
         mode_lbl.get_style_context().add_class("muted")
+
         content.pack_start(mode_lbl, False, False, 0)
-        content.pack_start(self.geo_combo, False, False, 0)
+        content.pack_start(geo_box, False, False, 0)
 
         self.geo_combo.connect("changed", self.on_geo_mode_changed)
+        disable_scroll_change(self.geo_combo)
+        set_hand_cursor_on_hover(self.geo_combo)
 
         preset_lbl = Gtk.Label(label=_("tab.location.card-geoloc.lbl-preset"), xalign=0)
         preset_lbl.get_style_context().add_class("muted")
@@ -1851,6 +1894,8 @@ class App(Gtk.Window):
         r_icon.set_property("xalign", 1.0)
         self.preset_combo.pack_start(r_icon, False)
         self.preset_combo.add_attribute(r_icon, "text", 2)
+        disable_scroll_change(self.preset_combo)
+        set_hand_cursor_on_hover(self.preset_combo)
 
         # Select current preset from cfg
         cur_preset = self.cfg.get("geolocation", {}).get("preset", "none")
@@ -1881,7 +1926,7 @@ class App(Gtk.Window):
         
         content.pack_start(preset_lbl, False, False, 0)
         content.pack_start(self.preset_combo, False, False, 0)
-        if cur_mode == "auto_ip":
+        if current_mode == "auto_ip":
             if hasattr(self, "_hid_preset_changed"):
                 self.preset_combo.handler_block(self._hid_preset_changed)
 
@@ -1914,14 +1959,17 @@ class App(Gtk.Window):
 
         # Button: clear city
         self.btn_city_clear = Gtk.Button.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
-        self.btn_city_clear.set_tooltip_text(_("tab.location.card-geoloc.btn-search"))
+        self.btn_city_clear.set_tooltip_text(_("tab.location.card-geoloc.btn-clear"))
         self.btn_city_clear.connect("clicked", self.on_city_clear_clicked)
+        set_hand_cursor_on_hover(self.btn_city_clear)
         city_row.pack_start(self.btn_city_clear, False, False, 0)
 
         # Button: geocode city -> lat/lon
         self.btn_city_search = Gtk.Button.new_from_icon_name("system-search-symbolic", Gtk.IconSize.BUTTON)
         self.btn_city_search.set_tooltip_text(_("tab.location.card-geoloc.btn-search"))
         self.btn_city_search.connect("clicked", self.on_city_search_clicked)
+        set_hand_cursor_on_hover(self.btn_city_search)
+
         city_row.pack_start(self.btn_city_search, False, False, 0)
 
         g.attach(city_row, 1, 2, 1, 1)
@@ -1976,18 +2024,23 @@ class App(Gtk.Window):
 
         btn_refresh = Gtk.Button(label=_("tab.images.card-action.btn-refresh"))
         btn_refresh.connect("clicked", lambda _b: self.refresh_images_preview())
+        set_hand_cursor_on_hover(btn_refresh)
+
         top.pack_start(btn_refresh, False, False, 0)
 
         btn_placeholders = Gtk.Button(label=_("tab.images.card-action.btn-create-placeholder"))
         btn_placeholders.connect("clicked", self.on_create_placeholders)
+        set_hand_cursor_on_hover(btn_placeholders)
         top.pack_start(btn_placeholders, False, False, 0)
 
         btn_open_base = Gtk.Button(label=_("tab.images.card-action.btn-open-base"))
         btn_open_base.connect("clicked", lambda _b: self._open_subdir("base", themed=True))
+        set_hand_cursor_on_hover(btn_open_base)
         top.pack_start(btn_open_base, False, False, 0)
 
         btn_open_meteo = Gtk.Button(label=_("tab.images.card-action.btn-open-weather"))
         btn_open_meteo.connect("clicked", lambda _b: self._open_subdir("meteo", themed=True))
+        set_hand_cursor_on_hover(btn_open_meteo)
         top.pack_start(btn_open_meteo, False, False, 0)
 
         page.pack_start(make_card(_("tab.images.card-action.title"), top), False, False, 0)
@@ -2030,32 +2083,6 @@ class App(Gtk.Window):
             pass
 
         return make_page(page)
-
-    # def build_tab_about(self):
-    #     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-
-    #     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-
-    #     title = Gtk.Label(label="Wallpaper Smart", xalign=0)
-    #     title.get_style_context().add_class("card-title")
-
-    #     txt = Gtk.Label(
-    #         label=(
-    #             "Application de fond d’ecran dynamique (heure + meteo).\n"
-    #             "Compatible GNOME / KDE.\n\n"
-    #             "Licence: MIT\n"
-    #             "Auteur: Spiderdev"
-    #         ),
-    #         xalign=0
-    #     )
-    #     txt.set_line_wrap(True)
-    #     txt.get_style_context().add_class("muted")
-
-    #     content.pack_start(title, False, False, 0)
-    #     content.pack_start(txt, False, False, 0)
-
-    #     box.pack_start(make_card("A propos", content), False, False, 0)
-    #     return make_page(box)
 
     def build_tab_about(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -2262,6 +2289,7 @@ class App(Gtk.Window):
 
             btn_pick = Gtk.Button(label=_("tab.images.card-base.btn-choose"))
             btn_pick.connect("clicked", self.on_pick_image, self._rel_path("base", f"{moment_key}.png"))
+            set_hand_cursor_on_hover(btn_pick)
             header.pack_end(btn_pick, False, False, 0)
 
             img = Gtk.Image()
@@ -2320,6 +2348,7 @@ class App(Gtk.Window):
             active_sw = Gtk.Switch()
             active_sw.set_active(True)
             active_sw.get_style_context().add_class("ws-switch")
+            set_hand_cursor_on_hover(active_sw)
             hid = active_sw.connect("notify::active", self.on_toggle_image_enabled, rel)
             active_sw._hid_active = hid
 
@@ -2328,6 +2357,7 @@ class App(Gtk.Window):
 
             btn_pick = Gtk.Button(label=_("tab.images.card-meteo.btn-choose"))
             btn_pick.connect("clicked", self.on_pick_image, rel)
+            set_hand_cursor_on_hover(btn_pick)
             header.pack_end(btn_pick, False, False, 0)
 
             img = Gtk.Image()
