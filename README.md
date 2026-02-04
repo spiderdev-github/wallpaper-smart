@@ -20,11 +20,17 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
 
 ---
 
-## 📖 Documentations
+## 📖 Documentation
 
 🇫🇷 Lire en français : [README FR](./docs/README.fr.md)  
 🇬🇧 Read in English : [README EN](./docs/README.en.md)
 
+---
+
+## 🛡️ Licence
+
+MIT License © SpiderDev  
+See the [LICENSE](LICENSE).
 
 ---
 
@@ -36,4 +42,23 @@ If Wallpaper Smart helps you in your daily life, you can support the project:
 - Buy Me a Coffee : https://buymeacoffee.com/spiderdev
 - Website : https://spiderdev.fr
 
+---
 
+## 🤝 Contributing
+
+Contributions are welcome!
+
+- forks + PR
+- UI improvements
+- new wallpaper themes
+- support multi-desktop support (KDE etc.)
+
+---
+
+## ⭐ Thanks
+
+- **GTK / GNOME**
+- **Open-Meteo API**
+- **systemd user services**
+- Ptifiela
+- and all future contributors ❤️

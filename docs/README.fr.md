@@ -38,7 +38,7 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
   - géolocalisation par IP (**auto_ip**)
   - mode manuel (**fixed**)
   - mode **Ville** avec recherche lat/lon via OpenStreetMap (**Nominatim**)
-  - presets “grandes capitales” avec **icône météo en temps réel** (indicatif)
+  - presets “grandes capitales” avec **icône météo en temps réel**
 
 - 🌍 **Multi‑langue (UI)**
   - Français, Anglais, Allemand, Espagnol, Arabe, Russe, Chinois  
