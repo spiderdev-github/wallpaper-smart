@@ -7,10 +7,10 @@
 
 Wallpaper Smart is a Linux (GNOME) application that automatically changes the wallpaper based on:
 
-✅ the time of day (dawn / noon / sunset / night)
-✅ real-time weather (Open-Meteo)
-✅ a theme system using templates
-✅ a simple and modern GTK interface to manage the settings
+✅ the time of day (dawn / noon / sunset / night)   
+✅ real-time weather (Open-Meteo)   
+✅ a theme system using templates   
+✅ a simple and modern GTK interface to manage the settings 
 
 ---
 
@@ -22,8 +22,9 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
 
 ## 📖 Documentations
 
-🇫🇷 Lire en français : [README.fr.md](README.fr.md)  
-🇬🇧 Read in English : [README.en.md](README.en.md)
+🇫🇷 Lire en français : [README FR](./docs/README.fr.md)  
+🇬🇧 Read in English : [README EN](./docs/README.en.md)
+
 
 ---
 
