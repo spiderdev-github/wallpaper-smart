@@ -168,7 +168,15 @@ chmod +x install.sh
 
 #### Useful options
 
+```bash
+  --walldir <dir>         Wallpaper root directory
+  --minutes <n>           Timer frequency (systemd only) (default: 10)
+  --no-deps               Do not attempt to install dependencies (only checks + hints)
+  --force-templates       Overwrite existing templates files (default: copy missing only)
+  --debug                 Verbose mode
+  --no-geo                Do not attempt to detect geolocation during install
 
+```
 
 ✅ An entry will appear in your applications : **Wallpaper Smart**
 

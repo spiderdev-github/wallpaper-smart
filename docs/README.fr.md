@@ -175,7 +175,7 @@ chmod +x install.sh
   --debug                 Mode verbeux
   --no-geo                Ne pas tenter de détecter la géolocalisation pendant l’installation
 
-```bash
+```
 
 ✅ Une entrée apparaîtra dans tes applications : **Wallpaper Smart**
 
