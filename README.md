@@ -178,7 +178,7 @@ chmod +x install.sh
 
 ```bash
 
-✅ An entry will appear in your applications : Wallpaper Smart
+✅ An entry will appear in your applications : **Wallpaper Smart**
 
 ---
 
