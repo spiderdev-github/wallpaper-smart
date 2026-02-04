@@ -13,7 +13,7 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
 ✅ a simple and modern GTK interface to manage the settings 
 
 ---
-<>
+
 ## 🚀 Version
 
 **v1.1.0**
