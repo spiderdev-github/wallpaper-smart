@@ -196,13 +196,13 @@ Exemple :
   "wallpaper_dir": "/home/user/.config/wallpaper-smart/wallpaper",
   "wallpaper_theme": "default",
   "schedule": {
-    "nuit_start": 19,
+    "nuit_start": 20,
     "aube_start": 5,
     "midi_start": 11,
     "coucher_start": 17
   },
   "geolocation": {
-    "mode": "auto_ip",
+    "mode": "fixed",
     "fixed": { "lat": 48.5839, "lon": 7.7455 },
     "city_name": "Strasbourg",
     "preset": "none"
@@ -218,7 +218,7 @@ Exemple :
   "timer_minutes": 10,
   "enabled_images": {},
   "ui": {
-    "language": "system"
+    "language": "fr_FR"
   }
 }
 ```
