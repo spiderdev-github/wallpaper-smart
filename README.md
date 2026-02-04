@@ -353,14 +353,6 @@ chmod +x uninstall.sh
 ```bash
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 ```
-
----
-
-## 🛡️ Licence
-
-MIT License © SpiderDev  
-See the [LICENSE](LICENSE).
-
 ---
 
 ## ❤️ Support the project
@@ -391,3 +383,10 @@ Contributions are welcome!
 - **systemd user services**
 - Ptifiela
 - and all future contributors ❤️
+
+---
+
+## 🛡️ Licence
+
+MIT License © SpiderDev  
+See the [LICENSE](LICENSE).

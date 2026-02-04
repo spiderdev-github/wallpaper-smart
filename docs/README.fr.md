@@ -355,13 +355,6 @@ journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 
 ---
 
-## 🛡️ Licence
-
-MIT License © SpiderDev  
-Voir le fichier [LICENSE](LICENSE).
-
----
-
 ## ❤️ Soutenir le projet
 
 Si Wallpaper Smart vous aide au quotidien, vous pouvez soutenir le projet :
@@ -388,3 +381,10 @@ Les contributions sont bienvenues !
 - **systemd user services**
 - Ptifiela
 - et tous les futurs contributeurs ❤️
+
+---
+
+## 🛡️ Licence
+
+MIT License © SpiderDev  
+Voir le fichier [LICENSE](LICENSE).
