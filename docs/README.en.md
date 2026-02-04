@@ -22,8 +22,7 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
 
 ## 📖 Documentations
 
-🇫🇷 Lire en français : [README.fr.md](README.fr.md)  
-🇬🇧 Read in English : [README.en.md](README.en.md)
+The English documentation is currently being edited.
 
 ---
 
@@ -34,5 +33,3 @@ If Wallpaper Smart helps you in your daily life, you can support the project:
 - PayPal : https://www.paypal.com/paypalme/lalsarok1
 - Buy Me a Coffee : https://buymeacoffee.com/spiderdev
 - Website : https://spiderdev.fr
-
-
