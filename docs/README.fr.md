@@ -22,7 +22,7 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
 
 ## 📖 Documentation
 
-🇬🇧 Read in English : [README EN](./README.md)
+🇬🇧 Read in English : [README EN](../README.md)
 
 ---
 
