@@ -182,14 +182,6 @@ chmod +x install.sh
 
 ---
 
-## ▶️ Launch the app
-
-```bash
-~/.local/bin/wallpaper-smart-ui
-```
-
----
-
 ## ⚙️ Configuration
 
 Config file:
@@ -274,6 +266,14 @@ templates/default/meteo/pluie_nuit.png
 ```
 
 The `<prefix>` values are configured in the **Mapping** tab of the UI.
+
+---
+
+## ▶️ Launch the app
+
+```bash
+~/.local/bin/wallpaper-smart-ui
+```
 
 ---
 
