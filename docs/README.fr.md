@@ -332,7 +332,7 @@ chmod +x uninstall.sh
 - [ ] Gestion avancée des thèmes (aperçu + import/export)
 - [ ] Permetre de planifier moment avec minutes 
 - [ ] Planification avancée : ajout des minutes pour les horaires (aube / midi / coucher / nuit)
-
+- [ ] Amélioration UI: si une image météo est manquante, afficher une icône d’avertissement à la place de l’icône photo dans Dernier fond
 ---
 
 ## ❓ FAQ
