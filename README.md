@@ -34,16 +34,6 @@ See the [LICENSE](LICENSE).
 
 ---
 
-## ❤️ Support the project
-
-If Wallpaper Smart helps you in your daily life, you can support the project:
-
-- PayPal : https://www.paypal.com/paypalme/lalsarok1
-- Buy Me a Coffee : https://buymeacoffee.com/spiderdev
-- Website : https://spiderdev.fr
-
----
-
 ## 🤝 Contributing
 
 Contributions are welcome!
@@ -62,3 +52,13 @@ Contributions are welcome!
 - **systemd user services**
 - Ptifiela
 - and all future contributors ❤️
+
+---
+
+## ❤️ Support the project
+
+If Wallpaper Smart helps you in your daily life, you can support the project:
+
+- PayPal : https://www.paypal.com/paypalme/lalsarok1
+- Buy Me a Coffee : https://buymeacoffee.com/spiderdev
+- Website : https://spiderdev.fr
