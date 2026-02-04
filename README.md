@@ -155,8 +155,8 @@ Installer (best-effort):
 ### 1) Clone the repo
 
 ```bash
-git clone https://github.com/<ton-user>/<ton-repo>.git
-cd <ton-repo>
+git clone https://github.com/<your-user>/<your-repo>.git
+cd <your-repo>
 ```
 
 ### 2) Run the installer
