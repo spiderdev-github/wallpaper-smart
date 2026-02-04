@@ -65,7 +65,7 @@ DEFAULT_CFG = {
 }
 
 APP_ID = "wallpaper-smart"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.3.0"
 LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
 
 
