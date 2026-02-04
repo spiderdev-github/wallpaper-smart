@@ -166,7 +166,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-#### OUseful options
+#### Useful options
 
 ```bash
   --walldir <chemin>      Wallpaper root directory
