@@ -169,7 +169,7 @@ chmod +x install.sh
 #### Useful options
 
 ```bash
-  --walldir <chemin>      Wallpaper root directory
+  --walldir <dir>         Wallpaper root directory
   --minutes <n>           Timer frequency (systemd only) (default: 10)
   --no-deps               Do not attempt to install dependencies (only checks + hints)
   --force-templates       Overwrite existing templates files (default: copy missing only)
@@ -178,7 +178,7 @@ chmod +x install.sh
 
 ```bash
 
-✅ An entry will appear in your applications : **Wallpaper Smart**
+✅ An entry will appear in your applications : Wallpaper Smart
 
 ---
 
