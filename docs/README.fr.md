@@ -330,6 +330,8 @@ chmod +x uninstall.sh
 - [x] Section géolocalisation : en mode « Ville », récupérer la latitude/longitude à partir de la ville saisie
 - [ ] Permettre la gestion des thèmes sombre et clair pour les fonds d’écran
 - [ ] Gestion avancée des thèmes (aperçu + import/export)
+- [ ] Permetre de planifier moment avec minutes 
+- [ ] Planification avancée : ajout des minutes pour les horaires (aube / midi / coucher / nuit)
 
 ---
 

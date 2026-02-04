@@ -331,6 +331,7 @@ chmod +x uninstall.sh
 - [x] Geolocation section: in “City” mode, retrieve latitude/longitude from the entered city
 - [ ] Allow dark and light theme management for wallpapers
 - [ ] Advanced theme management (preview + import/export)
+- [ ] Advanced scheduling: add minute support for time slots (dawn / noon / sunset / night)
 
 ---
 
