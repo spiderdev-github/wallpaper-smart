@@ -1122,7 +1122,7 @@ def make_card(title: str, content: Gtk.Widget):
 # ---------------- UI ----------------
 class App(Gtk.Window):
     def __init__(self):
-        super().__init__(title=f"Wallpaper Smart v.{APP_VERSION}")
+        super().__init__(title=f"Wallpaper Smart")
 
         self._dark = detect_dark_mode()
         apply_css(self._dark)
@@ -1174,8 +1174,12 @@ class App(Gtk.Window):
         sub = Gtk.Label(label=_("desc-app"), xalign=0)
         sub.get_style_context().add_class("header-sub")
 
+        version_lbl = Gtk.Label(label=f"v.{APP_VERSION}", xalign=0)
+        version_lbl.get_style_context().add_class("header-sub")
+
         header.pack_start(title, False, False, 0)
         header.pack_start(sub, False, False, 0)
+        header.pack_start(version_lbl, False, False, 0)
         root.pack_start(header, False, False, 0)
 
         # Notebook
