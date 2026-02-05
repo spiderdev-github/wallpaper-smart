@@ -1,4 +1,40 @@
 # Changelog
+## [1.3.1] - 2026-02-05
+### Added
+- Mécanisme d’état du wallpaper courant :
+  - stockage du dernier wallpaper appliqué dans `~/.config/wallpaper-smart/wallpaper/current.json`
+  - comparaison entre le wallpaper courant et le prochain à appliquer
+  - application du wallpaper uniquement si celui-ci est différent
+- Affichage de la version de l’application dans le header de l’UI
+  - facilite le support, le debug et les retours utilisateurs
+- Alerte utilisateur lors du changement de langue :
+  - message affiché dans la langue sélectionnée
+  - indication claire qu’un enregistrement + redémarrage de l’application est requis
+- Indicateur visuel ⚠️ dans le dashboard lorsque :
+  - aucun wallpaper météo correspondant n’est disponible
+  - fallback sur une image de base ou absence de fond valide
+
+### Changed
+- Optimisation majeure du script `wallpaper-smart.sh` :
+  - suppression des applications redondantes du wallpaper
+  - réduction drastique des appels GNOME / KDE
+  - amélioration de la stabilité sur sessions longues
+- Fréquence du timer désormais fiable même à **1 minute**
+  - sans blocage
+  - sans perte d’application du fond d’écran
+- Comportement du service systemd user amélioré :
+  - le service fonctionne correctement au démarrage du système
+  - plus besoin de lancer l’application UI pour initialiser le wallpaper
+
+### Fixed
+- Fix critique : bug où le wallpaper cessait de s’appliquer après plusieurs changements successifs
+  - nécessitait auparavant un redémarrage du PC
+- Correction du fichier `wallpaper-smart.service` :
+  - ajout des valeurs manquantes empêchant le bon démarrage automatique
+- Correctifs de cohérence UI :
+  - dashboard désormais aligné avec l’état réel du wallpaper appliqué
+  - meilleure lisibilité des erreurs liées aux fonds manquants
+
 
 ## [1.3.0] - 2026-02-04
 ### Added
