@@ -1010,23 +1010,12 @@ def prettify_wallpaper_log(line: str) -> str:
     if(candidate == "no"):
         # icon attention
         ICON = "⚠️ "
+        # ajouter un message d'erreur à la ligne   
+        err = _("tab.setting.dashboard-card.lbl-error")
+        return f"{ICON} {wallpaper_path}\n({err})"
     else:
         ICON = "✅ "
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    return f"{ICON} {wallpaper_path}"
-
+        return f"{ICON} {wallpaper_path}"
 
 
 # ---------------- Helpers ----------------
@@ -1549,8 +1538,22 @@ class App(Gtk.Window):
         lang = self.lang_combo.get_active_id() or "system"
         self.cfg.setdefault("ui", {})
         self.cfg["ui"]["language"] = lang
-        save_cfg(self.cfg)   # ton save existant
-        # Optional: show a muted hint label "Restart app to apply"
+        
+        LANGMSG: List[Tuple[str, str]] = [
+            ("fr_FR", _("La langue de l'interface a été changée."), _("Sauvegarde et redémarre l'application pour appliquer le changement.")),
+            ("en_US", _("The interface language has been changed."), _("Save and restart the application to apply the change.")),
+            ("de_DE", _("Die Sprache der Benutzeroberfläche wurde geändert."), _("Speichern und Neustart der Anwendung, um die Änderung anzuwenden.")),
+            ("sp_SP", _("El idioma de la interfaz ha sido cambiado."), _("Guarda y reinicia la aplicación para aplicar el cambio.")),
+            ("ar_AR", _("تم تغيير لغة الواجهة."), _("احفظ وأعد تشغيل التطبيق لتطبيق التغيير.")),
+            ("cn_CN", _("界面语言已更改。"), _("保存并重新启动应用程序以应用更改。")),
+            ("ru_RU", _("Язык интерфейса был изменен."), _("Сохраните и перезапустите приложение, чтобы применить изменения."))
+        ]
+
+        # trouver la langue sélectionnée dans LANGMSG et afficher le message correspondant
+        for l, msg, hint in LANGMSG:
+            if l == lang:
+                self.message(msg, hint)
+                break
 
         
 
@@ -3057,7 +3060,7 @@ class App(Gtk.Window):
             if idx_back != -1:
                 self.nb.set_current_page(idx_back)
 
-            self.message("OK", "Config enregistrée + systemd rechargé.")
+            self.message("OK", _("ui.saved-successfully"))
             self.refresh_toggle_label()
             self.refresh_dashboard()
         except Exception as e:
@@ -3130,17 +3133,17 @@ class App(Gtk.Window):
             )
 
             out = (p.stdout + "\n" + p.stderr).strip()
-            self.message(_("Résultat test"), out or _("(aucune sortie)"))
+            self.message(_("ui.test-result"), out or _("(ui.test-result-empty)"))
         except Exception as e:
-            self.message(_("Erreur test"), str(e))
+            self.message(_("ui.test-error"), str(e))
 
 
     def on_logs(self, _btn):
         try:
             p = run(["journalctl", "--user", "-u", SERVICE, "-n", "10", "--no-pager"])
-            self.message(_("Logs (10 dernières lignes)"), p.stdout.strip() or _("(vide)"))
+            self.message(_("ui.logs"), p.stdout.strip() or _("(ui.logs-empty)"))
         except Exception as e:
-            self.message(_("Erreur logs"), str(e))
+            self.message(_("ui.logs-error"), str(e))
 
     def on_toggle_timer(self, _btn):
         try:
@@ -3148,7 +3151,7 @@ class App(Gtk.Window):
             self.refresh_toggle_label()
             self.refresh_dashboard()
         except Exception as e:
-            self.message(_("Erreur timer"), str(e))
+            self.message(_("ui.timer-error"), str(e))
 
 def main():
     win = App()

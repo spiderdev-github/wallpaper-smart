@@ -332,7 +332,7 @@ chmod +x uninstall.sh
 - [ ] Allow dark and light theme management for wallpapers
 - [ ] Advanced theme management (preview + import/export)
 - [ ] Advanced scheduling: add minute support for time slots (dawn / noon / sunset / night)
-- [ ] UI improvement (wallpaper status): when a weather image is missing, display a warning icon 
+- [X] UI improvement (wallpaper status): when a weather image is missing, display a warning icon 
 
 ---
 
