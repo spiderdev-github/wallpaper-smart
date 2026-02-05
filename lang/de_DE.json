@@ -84,7 +84,6 @@
   "tab.images.card-base.btn-choose": "Auswählen…",
   "tab.images.card-meteo.title": "Wetter",
   "tab.images.card-meteo.state-nofound": "FEHLT",
-  "tab.images.card-meteo.state-nofound-low": "fehlt",
   "tab.images.card-meteo.btn-choose": "Auswählen…",
   "tab.about.card-about.title": "Über",
   "tab.about.card-about.label": "Dynamischer Hintergrund (Uhrzeit + Wetter) - GNOME / KDE",

@@ -84,7 +84,6 @@
   "tab.images.card-base.btn-choose": "Choisir…",
   "tab.images.card-meteo.title": "Météo",
   "tab.images.card-meteo.state-nofound": "MANQUANT",
-  "tab.images.card-meteo.state-nofound-low": "manquant",
   "tab.images.card-meteo.btn-choose": "Choisir…",
   "tab.about.card-about.title": "A propos",
   "tab.about.card-about.label": "Fond d'ecran dynamique (heure + meteo) - GNOME / KDE",

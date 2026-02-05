@@ -84,7 +84,6 @@
   "tab.images.card-base.btn-choose": "Выбрать…",
   "tab.images.card-meteo.title": "Погода",
   "tab.images.card-meteo.state-nofound": "ОТСУТСТВУЕТ",
-  "tab.images.card-meteo.state-nofound-low": "отсутствует",
   "tab.images.card-meteo.btn-choose": "Выбрать…",
   "tab.about.card-about.title": "О приложении",
   "tab.about.card-about.label": "Динамические обои (время + погода) - GNOME / KDE",

@@ -211,7 +211,7 @@ GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
     "jp_tokyo": ("🇯🇵 Tokyo", (35.6762, 139.6503)),
 }
 
-APP_LANG_DEFAULT = "en_US"
+APP_LANG_DEFAULT = "en_GB"
 _tr = {}
 _tr_fallback = {}
 
@@ -1516,7 +1516,7 @@ class App(Gtk.Window):
         # creer un tableau de langue
         LANGUAGES = {
             "fr_FR": "🇫🇷 " + _("tab.setting.lang-card.lbl-lang-fr"),
-            "en_US": "🇬🇧 " + _("tab.setting.lang-card.lbl-lang-en"),
+            "en_GB": "🇬🇧 " + _("tab.setting.lang-card.lbl-lang-en"),
             "de_DE": "🇩🇪 " + _("tab.setting.lang-card.lbl-lang-de"),
             "sp_SP": "🇪🇸 " + _("tab.setting.lang-card.lbl-lang-sp"),
             "ar_AR": "🇸🇦 " + _("tab.setting.lang-card.lbl-lang-ar"),
@@ -1530,8 +1530,8 @@ class App(Gtk.Window):
             self.lang_combo.append(key, label)
 
 
-        if cur_lang not in ["system", "fr_FR", "en_US", "de_DE", "sp_SP", "ar_AR", "cn_CN", "ru_RU"]:
-            cur_lang = "en_US"
+        if cur_lang not in ["system", "fr_FR", "en_GB", "de_DE", "sp_SP", "ar_AR", "cn_CN", "ru_RU"]:
+            cur_lang = "en_GB"
 
         self.lang_combo.set_active_id(cur_lang)
         self.lang_combo.connect("changed", self.on_language_changed)
@@ -1558,7 +1558,7 @@ class App(Gtk.Window):
         
         LANGMSG: List[Tuple[str, str]] = [
             ("fr_FR", _("La langue de l'interface a été changée."), _("Sauvegarde et redémarre l'application pour appliquer le changement.")),
-            ("en_US", _("The interface language has been changed."), _("Save and restart the application to apply the change.")),
+            ("en_GB", _("The interface language has been changed."), _("Save and restart the application to apply the change.")),
             ("de_DE", _("Die Sprache der Benutzeroberfläche wurde geändert."), _("Speichern und Neustart der Anwendung, um die Änderung anzuwenden.")),
             ("sp_SP", _("El idioma de la interfaz ha sido cambiado."), _("Guarda y reinicia la aplicación para aplicar el cambio.")),
             ("ar_AR", _("تم تغيير لغة الواجهة."), _("احفظ وأعد تشغيل التطبيق لتطبيق التغيير.")),
@@ -2915,7 +2915,7 @@ class App(Gtk.Window):
                 p = root / rel 
                 exists = p.exists()
 
-                path_lbl.set_text(str(p) if exists else f"{p} ({_('tab.images.card-meteo.state-nofound-low')})")
+                path_lbl.set_text(str(p))
                 pb = load_pixbuf_scaled(p) if exists else None
                 if pb:
                     img_widget.set_from_pixbuf(pb)
@@ -2929,7 +2929,7 @@ class App(Gtk.Window):
                     chip_lbl.set_text("OK")
                     ctx.add_class("chip-ok")
                 else:
-                    chip_lbl.set_text(_("tab.images.card-meteo.state-nofound-upper"))
+                    chip_lbl.set_text(_("tab.images.card-meteo.state-nofound"))
                     ctx.add_class("chip-miss")
 
                 if current_chip is not None:
@@ -2951,7 +2951,7 @@ class App(Gtk.Window):
             if hid is not None:
                 active_sw.handler_unblock(hid)
 
-            path_lbl.set_text(str(p) if exists else f"{p} ({_('manquant')})")
+            path_lbl.set_text(str(p))
             pb = load_pixbuf_scaled(p) if exists else None
             if pb:
                 img_widget.set_from_pixbuf(pb)
@@ -2965,7 +2965,7 @@ class App(Gtk.Window):
                 chip_lbl.set_text("OK")
                 ctx.add_class("chip-ok")
             else:
-                chip_lbl.set_text("MANQUANT")
+                chip_lbl.set_text(_("tab.images.card-meteo.state-nofound"))
                 ctx.add_class("chip-miss")
 
         # Re-apply filter after refresh

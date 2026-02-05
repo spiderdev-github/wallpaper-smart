@@ -84,7 +84,6 @@
   "tab.images.card-base.btn-choose": "Choose…",
   "tab.images.card-meteo.title": "Weather",
   "tab.images.card-meteo.state-nofound": "MISSING",
-  "tab.images.card-meteo.state-nofound-low": "missing",
   "tab.images.card-meteo.btn-choose": "Choose…",
   "tab.about.card-about.title": "About",
   "tab.about.card-about.label": "Dynamic wallpaper (time + weather) - GNOME / KDE",
