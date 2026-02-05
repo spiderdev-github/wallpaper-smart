@@ -1,116 +1,160 @@
 # Changelog
-## [1.3.1] - 2026-02-05
+
+🇫🇷 **Version française** : [CHANGELOG.fr.md](CHANGELOG.fr.md)
+
+---
+
+## [2.0.0] - 2026-02-05
+### 🚀 Major update – Desktop style integration (dark / light)
+
 ### Added
-- Mécanisme d’état du wallpaper courant :
-  - stockage du dernier wallpaper appliqué dans `~/.config/wallpaper-smart/wallpaper/current.json`
-  - comparaison entre le wallpaper courant et le prochain à appliquer
-  - application du wallpaper uniquement si celui-ci est différent
-- Affichage de la version de l’application dans le header de l’UI
-  - facilite le support, le debug et les retours utilisateurs
-- Alerte utilisateur lors du changement de langue :
-  - message affiché dans la langue sélectionnée
-  - indication claire qu’un enregistrement + redémarrage de l’application est requis
-- Indicateur visuel ⚠️ dans le dashboard lorsque :
-  - aucun wallpaper météo correspondant n’est disponible
-  - fallback sur une image de base ou absence de fond valide
+- Automatic wallpaper switching based on GNOME desktop style (dark / light)
+- Instant reaction to desktop style changes (event-driven mechanism)
+- Added new systemd user files:
+  - `wallpaper-smart-style-hook.path`
+  - `wallpaper-smart-style-hook.service`
+  - `wallpaper-smart-on-style-change.sh`
+- Full integration with GNOME `color-scheme` setting
+- Real-time wallpaper refresh without relying on the timer
 
 ### Changed
-- Optimisation majeure du script `wallpaper-smart.sh` :
-  - suppression des applications redondantes du wallpaper
-  - réduction drastique des appels GNOME / KDE
-  - amélioration de la stabilité sur sessions longues
-- Fréquence du timer désormais fiable même à **1 minute**
-  - sans blocage
-  - sans perte d’application du fond d’écran
-- Comportement du service systemd user amélioré :
-  - le service fonctionne correctement au démarrage du système
-  - plus besoin de lancer l’application UI pour initialiser le wallpaper
+- **Breaking change**: new mandatory template structure:
+  - `templates/<theme>/dark/base/`
+  - `templates/<theme>/light/base/`
+- `base/` directory is now required for **each style**
+- `meteo/` directory is now resolved per style (dark / light)
+- Complete rewrite of wallpaper resolution logic:
+  - style → time of day → weather → fallback
+- Improved template validation and fallback mechanisms
+- Documentation and README updated to reflect the new structure
+
+### Removed
+- Removed support for the legacy template structure:
+  - `templates/<theme>/base/`
 
 ### Fixed
-- Fix critique : bug où le wallpaper cessait de s’appliquer après plusieurs changements successifs
-  - nécessitait auparavant un redémarrage du PC
-- Correction du fichier `wallpaper-smart.service` :
-  - ajout des valeurs manquantes empêchant le bon démarrage automatique
-- Correctifs de cohérence UI :
-  - dashboard désormais aligné avec l’état réel du wallpaper appliqué
-  - meilleure lisibilité des erreurs liées aux fonds manquants
+- Edge cases where the wallpaper was not refreshed after a style change
+- Inconsistent behavior when switching quickly between dark and light modes
 
+---
+
+## [1.3.1] - 2026-02-05
+### Added
+- Current wallpaper state mechanism:
+  - storage of the last applied wallpaper in `~/.config/wallpaper-smart/wallpaper/current.json`
+  - comparison between the current wallpaper and the next one to apply
+  - wallpaper is applied only if it is different
+- Application version displayed in the UI header
+  - improves support, debugging, and user feedback
+- User alert when changing language:
+  - message displayed in the selected language
+  - clear indication that saving + application restart is required
+- Visual warning indicator ⚠️ in the dashboard when:
+  - no matching weather wallpaper is available
+  - fallback to a base image or no valid wallpaper is found
+
+### Changed
+- Major optimization of `wallpaper-smart.sh` script:
+  - removal of redundant wallpaper applications
+  - drastic reduction of GNOME / KDE calls
+  - improved stability during long sessions
+- Timer frequency is now reliable even at **1 minute**
+  - no blocking
+  - no wallpaper application loss
+- Improved systemd user service behavior:
+  - service now works correctly at system startup
+  - UI no longer needs to be launched to initialize the wallpaper
+
+### Fixed
+- Critical fix: wallpaper stopped updating after multiple successive changes
+  - previously required a system reboot
+- Fixed `wallpaper-smart.service`:
+  - added missing values preventing automatic startup
+- UI consistency fixes:
+  - dashboard now reflects the actual applied wallpaper state
+  - improved readability of errors related to missing wallpapers
+
+---
 
 ## [1.3.0] - 2026-02-04
 ### Added
-- Multi-langue (fr/en/de/es/ar/ru/zh) via fichiers JSON dans `lang/`
-- Sélection de la langue dans l’UI (onglet Général) + sauvegarde dans `config.json`
-- Géolocalisation à l’installation (définition automatique des valeurs par défaut) + option `--no-geo`
-- Mode géolocalisation “Ville” :
-  - saisie d’une ville
-  - récupération lat/lon via Nominatim (OpenStreetMap)
-- Presets de localisation (capitales) :
-  - sélection rapide
-  - affichage d’une icône météo en temps réel (indicatif / exemple)
-- Météo en temps réel sur les presets (exemple visuel / indicateur)
-- Onglet “À propos” :
-  - présentation du projet
+- Multi-language support (fr/en/de/es/ar/ru/zh) via JSON files in `lang/`
+- Language selection in the UI (General tab) with persistence in `config.json`
+- Geolocation during installation (automatic default values) with `--no-geo` option
+- “City” geolocation mode:
+  - city input
+  - lat/lon retrieval via Nominatim (OpenStreetMap)
+- Location presets (capitals):
+  - quick selection
+  - real-time weather icon display (indicative / example)
+- Real-time weather on presets (visual indicator)
+- “About” tab:
+  - project presentation
   - version
-  - licence
-  - liens (PayPal / BuyMeACoffee)
+  - license
+  - links (PayPal / BuyMeACoffee)
 
 ### Changed
-- Nouvelle arborescence wallpapers :
+- New wallpaper template structure:
   - `templates/<theme>/base/` → aube.png, midi.png, coucher.png, nuit.png
   - `templates/<theme>/meteo/` → `<prefix>_<moment>.png`
-- UI améliorée (ergonomie géoloc, presets, actions rapides)
-- Installation améliorée :
-  - création + upgrade automatique du `config.json`
-  - ajout d’une géoloc par défaut lors de l’installation
-  - copie templates plus robuste (rsync ou fallback cp)
+- Improved UI (geolocation ergonomics, presets, quick actions)
+- Improved installation process:
+  - automatic creation and upgrade of `config.json`
+  - default geolocation added during installation
+  - more robust template copy (rsync or fallback to cp)
 
 ### Fixed
-- Correctifs UI/GTK (stabilité générale + refresh)
-- Fix curseur “main/pointer” sur les ComboBox sans crash GTK
-- Correction du survol : le curseur ne s’applique plus à un bloc externe, uniquement sur le champ select
+- UI / GTK fixes (general stability + refresh)
+- Fixed “hand/pointer” cursor on ComboBox without GTK crashes
+- Hover fix: cursor now applies only to the select field, not to external blocks
 
+---
 
 ## [1.2.0] - 2026-02-04
 ### Added
-- Presets géolocalisation améliorés (meilleure sélection)
-- Détection météo (Open-Meteo) pour afficher une icône indicative dans la liste presets
-- Boutons UI “vider” + “rechercher lat/lon” pour la saisie ville
+- Improved geolocation presets (better selection)
+- Weather detection (Open-Meteo) to display an indicative icon in the preset list
+- UI buttons “clear” and “search lat/lon” for city input
 
 ### Changed
-- UI localisation plus intuitive (modes + champs mieux gérés)
-- Rafraîchissement dashboard plus stable
+- More intuitive location UI (modes + better field handling)
+- More stable dashboard refresh
 
 ### Fixed
-- Désactivation preset_combo quand mode = city
-- Correctifs de focus UI (orange/hover)
+- Disable preset_combo when mode = city
+- UI focus fixes (orange / hover)
 
+---
 
 ## [1.1.0] - 2026-02-03
 ### Added
-- Mode “city” (ville) introduit dans l’UI
-- Mapping météo → préfixes plus clair
-- Améliorations onglet Images :
+- “City” mode introduced in the UI
+- Clearer weather → prefix mapping
+- Image tab improvements:
   - placeholders
   - previews
-  - ouverture dossiers base/ et meteo/
+  - open base/ and meteo/ directories
 
 ### Changed
-- Amélioration logique de config + sauvegarde
+- Improved config logic and persistence
 
+---
 
 ## [1.0.0] - 2026-02-02
 ### Added
-- Première version stable
-- UI GTK3 (configuration)
-- Script principal `wallpaper-smart.sh`
-- Service + timer systemd user
+- First stable release
+- GTK3 UI (configuration)
+- Main script `wallpaper-smart.sh`
+- systemd user service + timer
 - Configuration via `~/.config/wallpaper-smart/config.json`
-- Gestion des wallpapers selon l’heure (aube/midi/coucher/nuit)
-- Météo via Open-Meteo + mapping configurable
-- Templates wallpapers (base + meteo)
+- Time-based wallpaper management (dawn / noon / sunset / night)
+- Weather via Open-Meteo with configurable mapping
+- Wallpaper templates (base + meteo)
 
+---
 
 ## [0.1.0] - 2026-01-30
 ### Added
-- Début du projet Wallpaper Smart
-- Base du concept : fond d’écran dynamique selon l’heure + météo
+- Start of the Wallpaper Smart project
+- Core concept: dynamic wallpaper based on time of day and weather

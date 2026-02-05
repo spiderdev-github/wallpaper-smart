@@ -73,9 +73,14 @@ req_file() { [[ -f "$1" ]] || { err "Manquant: $1"; exit 1; }; }
 
 req_file "$SRC/wallpaper-smart.sh"
 req_file "$SRC/wallpaper-smart-ui"
+req_file "$SRC/wallpaper-smart-on-style-change.sh"
+req_file "$SRC/wallpaper-smart-mkplaceholders.sh"
+
 req_file "$SRC/wallpaper-smart.service"
 req_file "$SRC/wallpaper-smart.timer"
-req_file "$SRC/wallpaper-smart-mkplaceholders.sh"
+
+req_file "$SRC/wallpaper-smart-style-hook.service"
+req_file "$SRC/wallpaper-smart-style-hook.path"
 
 log "WALLDIR:  $WALLDIR"
 log "Minutes:  $MINUTES"
@@ -281,6 +286,12 @@ install -m 755 "$SRC/wallpaper-smart.sh" "$HOME/.local/bin/wallpaper-smart.sh"
 install -m 755 "$SRC/wallpaper-smart-ui" "$HOME/.local/bin/wallpaper-smart-ui"
 install -m 755 "$SRC/wallpaper-smart-mkplaceholders.sh" "$HOME/.local/bin/wallpaper-smart-mkplaceholders.sh"
 
+
+install -m 755 "$SRC/wallpaper-smart-on-style-change.sh" "$HOME/.local/bin/wallpaper-smart-on-style-change.sh"
+install -m 755 "$SRC/wallpaper-smart-style-hook.service" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.service"
+install -m 755 "$SRC/wallpaper-smart-style-hook.path" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.path"
+
+
 log "Installation des langs dans ~/.config/wallpaper-smart (écrasement si existant)..."
 
 # Templates (optional)
@@ -365,6 +376,9 @@ default = {
   },
   "timer_minutes": minutes,
   "enabled_images": {},
+  "ui": {
+    "language": "system"
+  }
 }
 
 def deep_merge(a, b):
@@ -408,7 +422,9 @@ if [[ "$HAS_SYSTEMD" == "1" ]]; then
   mkdir -p "$HOME/.config/systemd/user"
   install -m 644 "$SRC/wallpaper-smart.service" "$HOME/.config/systemd/user/wallpaper-smart.service"
   install -m 644 "$SRC/wallpaper-smart.timer" "$HOME/.config/systemd/user/wallpaper-smart.timer"
-
+  # install -m 644 "$SRC/wallpaper-smart-style-hook.service" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.service"
+  install -m 644 "$SRC/wallpaper-smart-style-hook.path" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.path"
+  
   log "Création overrides systemd (CONFIG_FILE + fréquence)..."
   mkdir -p "$HOME/.config/systemd/user/wallpaper-smart.service.d"
   cat > "$HOME/.config/systemd/user/wallpaper-smart.service.d/override.conf" <<EOF
@@ -425,6 +441,8 @@ EOF
   log "Activation timer systemd..."
   systemctl --user daemon-reload || true
   systemctl --user enable --now wallpaper-smart.timer || true
+  log "Activation hook changement de style (systemd path)..."
+  systemctl --user enable --now wallpaper-smart-style-hook.path || true
 else
   warn "systemd user non détecté -> timer non installé."
   warn "Tu peux lancer le script manuellement, ou le planifier via cron/anacron."

@@ -16,7 +16,10 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
 
 ## 🚀 Version
 
-**v1.1.0**
+**v2.0.0**
+
+⚠️ Version 2.0.0 introduces breaking changes.
+Existing themes must be migrated to the new dark/light structure.
 
 ---
 
@@ -30,25 +33,35 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
 
 - 🌗 **Dynamic wallpaper by time period**
   - dawn / noon / sunset / night
+  - automatic selection based on local time
 
 - 🌦️ **Real-time weather**
   - clear / cloudy / fog / rain / snow / thunder
-  - configurable mapping (`clear`, `cloudy`, etc.)
+  - configurable weather mapping
+  - fallback to `base/` images if no weather match
 
 - 🎨 **Wallpaper themes (templates)**
-  - managed via `templates/<theme>/...`
-  - theme selection in the UI
-  - automatic theme validation (base + minimum 4 images)
+  - managed via `templates/<theme>/<style>/...`
+  - automatic **dark / light** style detection (GNOME)
+  - `base/` variant **mandatory**, `meteo/` **optional**
+  - automatic theme validation (structure + required images)
+  - theme selection via the UI
+
+- 🌓 **Desktop style integration (GNOME)**
+  - automatic switch between **dark** and **light** wallpapers
+  - reacts instantly to GNOME style changes
+  - powered by **systemd user path + service**
+  - no user action required
 
 - 📍 **Location**
   - IP-based geolocation (**auto_ip**)
   - manual mode (**fixed**)
   - **City** mode with lat/lon search via OpenStreetMap (**Nominatim**)
-  - “major capitals” presets with **real-time weather icon**
+  - “major capitals” presets with real-time weather icon
 
 - 🌍 **Multi-language (UI)**
   - French, English, German, Spanish, Arabic, Russian, Chinese
-  *(depending on available files in `lang/`)*
+  - (depending on available files in `lang/`)
 
 - 🖥️ **GTK interface (Wallpaper Smart UI)**
   - image preview
@@ -57,15 +70,15 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
   - instant test without saving
 
 - ⏱️ **Automatic updates**
-  - via **systemd user timer** (if available)
-  - otherwise can be scheduled via cron
+  - via **systemd user timer**
+  - fallback to cron if systemd is not available
 
 - 📍 **Geolocation during installation (optional)**
   - detects a default location during `install.sh`
   - can be disabled with `--no-geo`
 
-- ℹ️ **“About” section**
-  - project info + links
+- ℹ️ **About section**
+  - project information and links
   - donation links (PayPal / BuyMeACoffee)
 
 ---
@@ -86,7 +99,7 @@ Wallpaper Smart is a Linux (GNOME) application that automatically changes the wa
 
 Installer (best-effort):
 
-- `bash`, `curl`, `jq`
+- `git`, `bash`, `curl`, `jq`
 - `python3`
 - `python3-gi` + GTK3 + Cairo (depends on distribution)
 - `xdg-utils`
@@ -105,21 +118,35 @@ Installer (best-effort):
 │   ├── wallpaper-smart-ui
 │   ├── wallpaper-smart.service
 │   ├── wallpaper-smart.timer
-│   └── wallpaper-smart-mkplaceholders.sh
+│   ├── wallpaper-smart-mkplaceholders.sh
+│   ├── wallpaper-smart-on-style-change.sh
+│   ├── wallpaper-smart-style-hook.service
+│   └── wallpaper-smart-style-hook.path
+│
 ├── wallpaper/
 │   └── templates/
 │       └── default/
-│       │   ├── base/
-│       │   │   ├── aube.png
-│       │   │   ├── midi.png
-│       │   │   ├── coucher.png
-│       │   │   └── nuit.png
-│       │   └── meteo/
-│       │       ├── clair_aube.png
-│       │       ├── clair_midi.png
-│       │       └── ...
-│       │
-│       └── ...
+│           ├── dark/
+│           │   ├── base/        # Mandatory
+│           │   │   ├── aube.png
+│           │   │   ├── midi.png
+│           │   │   ├── coucher.png
+│           │   │   └── nuit.png
+│           │   └── meteo/       # Optional
+│           │       ├── clair_aube.png
+│           │       ├── clair_midi.png
+│           │       └── ...
+│           │
+│           └── light/
+│               ├── base/        # Mandatory
+│               │   ├── aube.png
+│               │   ├── midi.png
+│               │   ├── coucher.png
+│               │   └── nuit.png
+│               └── meteo/       # Optional
+│                   ├── clair_aube.png
+│                   ├── clair_midi.png
+│                   └── ...
 │
 └── lang/
     ├── en_US.json
@@ -204,8 +231,11 @@ Example :
   },
   "geolocation": {
     "mode": "fixed",
-    "fixed": { "lat": 48.5839, "lon": 7.7455 },
-    "city_name": "Strasbourg",
+    "fixed": {
+      "lat": 48.8566,
+      "lon": 2.3522
+    },
+    "city_name": "Paris",
     "preset": "none"
   },
   "weather_mapping": {
@@ -216,36 +246,51 @@ Example :
     "snow": "neige",
     "thunder": "orage"
   },
-  "timer_minutes": 10,
+  "timer_minutes": 5,
   "enabled_images": {},
   "ui": {
-    "language": "en_US"
+    "language": "system"
   }
 }
+
 ```
 
 ---
 
 ## 🎨 Templates & themes
 
-Wallpaper Smart uses a strict structure to validate a theme.
+Wallpaper Smart uses a strict and predictable structure to validate and load themes.
 
 ### ✅ A theme is valid if :
 
-- `templates/<theme>/base/` exists
-- and contains at least:
+- `templates/<theme>/dark/base/` exists
+- `templates/<theme>/light/base/` exists
+- each base/ directory contains at least:
   - `aube.png`
   - `midi.png`
   - `coucher.png`
   - `nuit.png`
 
+- The base/ variant is ***mandatory***.
+- Additional variants (such as meteo/) are ***optional***.
+
 Example :
 
 ```
-templates/default/base/aube.png
-templates/default/base/midi.png
-templates/default/base/coucher.png
-templates/default/base/nuit.png
+templates/<theme>/
+├── dark/
+│   └── base/
+│       ├── aube.png
+│       ├── midi.png
+│       ├── coucher.png
+│       └── nuit.png
+│
+└── light/
+    └── base/
+        ├── aube.png
+        ├── midi.png
+        ├── coucher.png
+        └── nuit.png
 ```
 
 ### Weather (optional)
@@ -253,16 +298,36 @@ templates/default/base/nuit.png
 If you want to enable weather:
 
 ```
-templates/<theme>/meteo/<prefix>_<moment>.png
+templates/<theme>/dark/meteo/<prefix>_<moment>.png
+templates/<theme>/light/meteo/<prefix>_<moment>.png
 ```
 
 Examples :
 
 ```
-templates/default/meteo/pluie_aube.png
-templates/default/meteo/pluie_midi.png
-templates/default/meteo/pluie_coucher.png
-templates/default/meteo/pluie_nuit.png
+templates/<theme>/
+├── dark/
+│   ├── base/        # Mandatory
+│   │   ├── aube.png
+│   │   ├── midi.png
+│   │   ├── coucher.png
+│   │   └── nuit.png
+│   └── meteo/       # Optional
+│       ├── <prefix>_aube.png
+│       ├── <prefix>_midi.png
+│       └── ...
+│
+└── light/
+    ├── base/        # Mandatory
+    │   ├── aube.png
+    │   ├── midi.png
+    │   ├── coucher.png
+    │   └── nuit.png
+    └── meteo/       # Optional
+        ├── <prefix>_aube.png
+        ├── <prefix>_midi.png
+        └── ...
+
 ```
 
 The `<prefix>` values are configured in the **Mapping** tab of the UI.
@@ -297,7 +362,9 @@ Useful commands:
 ```bash
 systemctl --user status wallpaper-smart.timer
 systemctl --user start wallpaper-smart.service
+systemctl --user wallpaper-smart-style-hook.path
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
+journalctl --user -u wallpaper-smart-style-hook.service -n 50 --no-pager
 ```
 
 ---
@@ -329,7 +396,7 @@ chmod +x uninstall.sh
 - [x] Add multi-language support
 - [x] Detect geolocation during installation to set default latitude/longitude (optional)
 - [x] Geolocation section: in “City” mode, retrieve latitude/longitude from the entered city
-- [ ] Allow dark and light theme management for wallpapers
+- [x] Allow dark and light theme management for wallpapers
 - [ ] Advanced theme management (preview + import/export)
 - [ ] Advanced scheduling: add minute support for time slots (dawn / noon / sunset / night)
 - [X] UI improvement (wallpaper status): when a weather image is missing, display a warning icon 

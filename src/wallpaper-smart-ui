@@ -65,7 +65,7 @@ DEFAULT_CFG = {
 }
 
 APP_ID = "wallpaper-smart"
-APP_VERSION = "1.3.1"
+APP_VERSION = "2.0.0"
 LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
 
 
@@ -327,6 +327,9 @@ def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
 # ---------------- Wallpaper themes ----------------
 def load_wallpaper_themes(wallpaper_dir: str) -> List[Tuple[str, str]]:
     root = Path(wallpaper_dir).expanduser()
+
+    mode = "dark" if detect_dark_mode() else "light"
+
     troot = root / "templates"
     out: List[Tuple[str, str]] = []
 
@@ -338,7 +341,8 @@ def load_wallpaper_themes(wallpaper_dir: str) -> List[Tuple[str, str]]:
     for d in sorted([p for p in troot.iterdir() if p.is_dir()]):
         theme_id = d.name
 
-        base_dir = d / "base"
+        
+        base_dir = d / mode / "base"
         if not base_dir.is_dir():
             continue
 
@@ -1500,20 +1504,33 @@ class App(Gtk.Window):
         lbl.get_style_context().add_class("muted")
         content.pack_start(lbl, False, False, 0)
 
-        # Combo
-        self.lang_combo = Gtk.ComboBoxText()
-        self.lang_combo.append("fr_FR", "🇫🇷 " + _("tab.setting.lang-card.lbl-fang-fr"))
-        self.lang_combo.append("en_US", "🇬🇧 " + _("tab.setting.lang-card.lbl-fang-en"))
-        self.lang_combo.append("de_DE", "🇩🇪 " + _("tab.setting.lang-card.lbl-fang-de"))
-        self.lang_combo.append("sp_SP", "🇪🇸 " + _("tab.setting.lang-card.lbl-fang-sp"))
-        self.lang_combo.append("ar_AR", "🇸🇦 " + _("tab.setting.lang-card.lbl-fang-ar"))
-        self.lang_combo.append("cn_CN", "🇨🇳 " + _("tab.setting.lang-card.lbl-fang-cn"))
-        self.lang_combo.append("ru_RU", "🇷🇺 " + _("tab.setting.lang-card.lbl-fang-ru"))
-
+        # get current language from cfg, default to system
         ui = self.cfg.get("ui", {}) if isinstance(self.cfg.get("ui", {}), dict) else {}
         cur_lang = ui.get("language", "system")
+        print('Current language:', cur_lang)
 
-        if cur_lang not in ["fr_FR", "en_US", "de_DE", "sp_SP", "ar_AR", "cn_CN", "ru_RU"]:
+        # Combo
+        lang = _detect_system_lang()
+        
+
+        # creer un tableau de langue
+        LANGUAGES = {
+            "fr_FR": "🇫🇷 " + _("tab.setting.lang-card.lbl-lang-fr"),
+            "en_US": "🇬🇧 " + _("tab.setting.lang-card.lbl-lang-en"),
+            "de_DE": "🇩🇪 " + _("tab.setting.lang-card.lbl-lang-de"),
+            "sp_SP": "🇪🇸 " + _("tab.setting.lang-card.lbl-lang-sp"),
+            "ar_AR": "🇸🇦 " + _("tab.setting.lang-card.lbl-lang-ar"),
+            "cn_CN": "🇨🇳 " + _("tab.setting.lang-card.lbl-lang-cn"),
+            "ru_RU": "🇷🇺 " + _("tab.setting.lang-card.lbl-lang-ru")
+        }
+        
+        self.lang_combo = Gtk.ComboBoxText()
+        self.lang_combo.append("system", _("tab.setting.lang-card.lbl-lang-system") + " :" + f" {LANGUAGES.get(lang, lang)}")
+        for key, label in LANGUAGES.items():
+            self.lang_combo.append(key, label)
+
+
+        if cur_lang not in ["system", "fr_FR", "en_US", "de_DE", "sp_SP", "ar_AR", "cn_CN", "ru_RU"]:
             cur_lang = "en_US"
 
         self.lang_combo.set_active_id(cur_lang)

@@ -56,6 +56,8 @@ CRON_MARKER_FILE="$CONFIG_DIR/.cron-installed"
 
 SERVICE="wallpaper-smart.service"
 TIMER="wallpaper-smart.timer"
+STYLE_HOOK="wallpaper-smart-style-hook.service"
+STYLE_HOOK_PATH="wallpaper-smart-style-hook.path"
 DESKTOP_FILE="$APP_DIR/wallpaper-smart.desktop"
 APP_ICON="$APP_DIR/wallpaper-smart.png"
 
@@ -72,6 +74,12 @@ if command -v systemctl >/dev/null 2>&1; then
   if systemctl --user list-unit-files 2>/dev/null | grep -q "^${SERVICE}"; then
     systemctl --user disable --now "$SERVICE" >/dev/null 2>&1 || true
   fi
+  if systemctl --user list-unit-files 2>/dev/null | grep -q "^${STYLE_HOOK}"; then
+    systemctl --user disable --now "$STYLE_HOOK" >/dev/null 2>&1 || true
+  fi
+  if systemctl --user list-unit-files 2>/dev/null | grep -q "^${STYLE_HOOK_PATH}"; then
+    systemctl --user disable --now "$STYLE_HOOK_PATH" >/dev/null 2>&1 || true
+  fi
   systemctl --user daemon-reload >/dev/null 2>&1 || true
 fi
 
@@ -87,13 +95,16 @@ log "Removing installed files..."
 rm -f "$BIN_DIR/wallpaper-smart.sh" || true
 rm -f "$BIN_DIR/wallpaper-smart-ui" || true
 rm -f "$BIN_DIR/wallpaper-smart-mkplaceholders.sh" || true
+rm -f "$BIN_DIR/wallpaper-smart-on-style-change.sh" || true
 
 # systemd units
 rm -f "$SYSTEMD_USER_DIR/$SERVICE" || true
 rm -f "$SYSTEMD_USER_DIR/$TIMER" || true
+rm -f "$SYSTEMD_USER_DIR/$STYLE_HOOK" || true
+rm -f "$SYSTEMD_USER_DIR/$STYLE_HOOK_PATH" || true
 rm -rf "$SYSTEMD_USER_DIR/${SERVICE}.d" || true
 rm -rf "$SYSTEMD_USER_DIR/${TIMER}.d" || true
-
+rm -rf "$SYSTEMD_USER_DIR/${STYLE_HOOK}.d" || true
 # desktop entry + icon
 rm -f "$DESKTOP_FILE" || true
 rm -f "$APP_ICON" || true

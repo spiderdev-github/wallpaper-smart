@@ -7,7 +7,7 @@ set -Eeuo pipefail
 CONFIG_FILE="${CONFIG_FILE:-$HOME/.config/wallpaper-smart/config.json}"
 
 # Fallbacks (si pas de config)
-WALLDIR_DEFAULT="$HOME/Images/wallpaper"
+WALLDIR_DEFAULT="$HOME/.config/wallpaper-smart/wallpaper"
 LAT_FALLBACK="48.5839"   # Strasbourg
 LON_FALLBACK="7.7455"
 
@@ -68,6 +68,16 @@ fi
 
 TEMPLATEDIR="$WALLDIR/templates/$WALL_THEME"
 
+# check style actuel mode dark ou light de l'OS (pour choisir le bon dossier de base)
+STYLE="light"
+if [[ "$DESKTOP" == *"gnome"* ]]; then
+  if gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null | grep -q "prefer-dark"; then
+    STYLE="dark"
+  fi
+fi
+
+
+TEMPLATEDIR="$TEMPLATEDIR/$STYLE"
 BASEDIR="$TEMPLATEDIR/base"
 METEODIR="$TEMPLATEDIR/meteo"
 TARGET="$WALLDIR/current.png"
@@ -220,7 +230,7 @@ fi
 # -----------------------------
 # Choix image finale
 # -----------------------------
-REL_METEO="templates/${WALL_THEME}/meteo/${PREFIX}_${MOMENT}.png"
+REL_METEO="templates/${WALL_THEME}/${STYLE}/meteo/${PREFIX}_${MOMENT}.png"
 CANDIDATE="$WALLDIR/$REL_METEO"
 BASE="$BASEDIR/${MOMENT}.png"
 HAVE_CANDIDATE="no"

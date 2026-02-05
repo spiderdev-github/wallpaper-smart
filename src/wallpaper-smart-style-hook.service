@@ -1,0 +1,10 @@
+[Unit]
+Description=Hook GNOME style change -> restart wallpaper-smart
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wallpaper-smart-on-style-change.sh
+Restart=on-failure
+RestartSec=2

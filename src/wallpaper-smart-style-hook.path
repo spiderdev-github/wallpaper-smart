@@ -1,0 +1,10 @@
+[Unit]
+Description=Watch dconf changes to trigger wallpaper-smart (GNOME style)
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Path]
+PathChanged=%h/.config/dconf/user
+
+[Install]
+WantedBy=default.target
