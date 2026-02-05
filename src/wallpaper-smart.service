@@ -1,8 +1,15 @@
 # wallpaper-smart.service
 [Unit]
 Description=Smart wallpaper updater (time + weather)
+After=graphical-session.target
+Wants=graphical-session.target
 
 [Service]
-Type=oneshot
+Type=simple
 # WALLDIR sera fourni par un override ou par l'environnement utilisateur
 ExecStart=%h/.local/bin/wallpaper-smart.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
