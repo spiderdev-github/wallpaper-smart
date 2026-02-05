@@ -2705,6 +2705,7 @@ class App(Gtk.Window):
             self.btn_city_clear.set_sensitive(True)
             self.btn_city_search.set_sensitive(True)
         else:
+            self.preset_combo.set_active(-1)  # solution 2: no selection
             self.preset_combo.set_sensitive(False)
             # auto_ip
             if hasattr(self, "lat_entry"):
