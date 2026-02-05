@@ -933,23 +933,23 @@ def prettify_meteo_log(line: str) -> str:
     """
     Convert a raw wallpaper-smart.sh journal line into a user-friendly text.
     Expected pattern inside line:
-      moment=... | bucket=... | prefix=... | code=... | LAT=... LON=...
+      moment=... | bucket=... | prefix=... | candidate=... | code=... | LAT=... LON=...
     """
     import re
 
     m = re.search(
-        r"moment=(\w+)\s*\|\s*bucket=(\w+)\s*\|\s*prefix=([^\s|]+)\s*\|\s*code=(\d+)\s*\|\s*LAT=([-\d.]+)\s*LON=([-\d.]+)",
+        r"moment=(\w+)\s*\|\s*bucket=(\w+)\s*\|\s*prefix=([^\s|]+)\s*\|\s*candidate=(\w+)\s*\|\s*code=(\d+)\s*\|\s*LAT=([-\d.]+)\s*LON=([-\d.]+)",
         line,
     )
 
     # If no match, keep it short but still readable
     if not m:
         s = (line or "").strip()
-        if len(s) > 160:
-            s = s[:160] + "…"
+        if len(s) > 250:
+            s = s[:250] + "…"
         return s or "—"
 
-    moment, bucket, _prefix, code, lat, lon = m.groups()
+    moment, bucket, _prefix, candidate, code, lat, lon = m.groups()
 
     moment_txt = MOMENT_LABELS.get(moment, moment)
     meteo_txt, emoji = BUCKET_LABELS.get(bucket, (bucket, "🌡️"))
@@ -993,7 +993,39 @@ def prettify_wallpaper_log(line: str) -> str:
         return s or "—"
 
     wallpaper_path = m.group(1)
-    return f"🖼️ {wallpaper_path}"
+
+    m = re.search(
+        r"moment=(\w+)\s*\|\s*bucket=(\w+)\s*\|\s*prefix=([^\s|]+)\s*\|\s*candidate=(\w+)\s*\|\s*code=(\d+)\s*\|\s*LAT=([-\d.]+)\s*LON=([-\d.]+)",
+        line,
+    )
+
+    # If no match, keep it short but still readable
+    if not m:
+        s = (line or "").strip()
+        if len(s) > 250:
+            s = s[:250] + "…"
+        return s or "—"
+
+    moment, bucket, _prefix, candidate, code, lat, lon = m.groups()
+    if(candidate == "no"):
+        # icon attention
+        ICON = "⚠️ "
+    else:
+        ICON = "✅ "
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    return f"{ICON} {wallpaper_path}"
 
 
 
@@ -1781,11 +1813,12 @@ class App(Gtk.Window):
                 if "moment=" in line and "code=" in line:
                     meta_line = line.strip()
                     break
-                    
+
             if meta_line:
                 self.dash_meteo.set_text(prettify_meteo_log(meta_line))
             else:
                 self.dash_meteo.set_text("—")
+            print("Meta line: %s" % meta_line)
 
             if wall_line:
                 self.dash_wall.set_text(prettify_wallpaper_log(wall_line))

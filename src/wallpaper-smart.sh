@@ -223,10 +223,13 @@ fi
 REL_METEO="templates/${WALL_THEME}/meteo/${PREFIX}_${MOMENT}.png"
 CANDIDATE="$WALLDIR/$REL_METEO"
 BASE="$BASEDIR/${MOMENT}.png"
+HAVE_CANDIDATE="no"
+
 
 CHOSEN="$BASE"
 if [[ -f "$CANDIDATE" ]] && is_enabled_image "$REL_METEO"; then
   CHOSEN="$CANDIDATE"
+  HAVE_CANDIDATE="yes"
 fi
 
 if [[ ! -f "$CHOSEN" ]]; then
@@ -255,7 +258,7 @@ fi
 
 # If same rel and target already exists, do nothing
 if [[ -n "$PREV_REL" && "$PREV_REL" == "$REL_CHOSEN" && -f "$TARGET" ]]; then
-  log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+  log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | candidate=$HAVE_CANDIDATE | code=$CODE | LAT=$LAT LON=$LON)"
   log "==> Wallpaper unchanged, skip apply (rel=$REL_CHOSEN)"
   exit 0
 fi
@@ -284,14 +287,14 @@ cp -f "$CHOSEN" "$TARGET"
 if [[ "$DESKTOP" == *"gnome"* ]]; then
   if gsettings set org.gnome.desktop.background picture-uri "file://$TARGET" 2>/dev/null; then
     gsettings set org.gnome.desktop.background picture-uri-dark "file://$TARGET" 2>/dev/null || true
-    log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+    log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | candidate=$HAVE_CANDIDATE | code=$CODE | LAT=$LAT LON=$LON)"
   else
     warn "gsettings a échoué (session GNOME pas prête). Fichier prêt: $TARGET"
   fi
 
 elif [[ "$DESKTOP" == *"kde"* || "$DESKTOP" == *"plasma"* ]]; then
   if set_wallpaper_kde "$TARGET"; then
-    log "✅ Wallpaper: $CHOSEN (KDE | moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | code=$CODE | LAT=$LAT LON=$LON)"
+    log "✅ Wallpaper: $CHOSEN (KDE | moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | candidate=$HAVE_CANDIDATE | code=$CODE | LAT=$LAT LON=$LON)"
   else
     log "WARN: echec KDE. Fichier pret: $TARGET"
   fi
