@@ -5,27 +5,35 @@
 ![Desktop](https://img.shields.io/badge/desktop-GNOME%20%7C%20KDE-orange)
 ![GTK](https://img.shields.io/badge/GTK-3.x-purple)
 
-Wallpaper Smart is a Linux (GNOME) application that automatically changes the wallpaper based on:
+Wallpaper Smart is a Linux (GNOME/KDE) application that automatically changes the wallpaper based on:
 
-✅ the time of day (dawn / noon / sunset / night)   
-✅ real-time weather (Open-Meteo)   
-✅ a theme system using templates   
-✅ a simple and modern GTK interface to manage the settings 
+✅ the time of day (dawn / noon / sunset / night)  
+✅ real-time weather (Open-Meteo)  
+✅ a theme system using templates  
+✅ a simple and modern GTK interface to manage the settings
 
 ---
 
 ## 🚀 Version
 
-**v2.0.0**
+**v1.0.0 (stable)**
 
-⚠️ Version 2.0.0 introduces breaking changes.
-Existing themes must be migrated to the new dark/light structure.
+Wallpaper Smart is production-ready:
+- services start **at user login**
+- wallpaper is applied immediately at session startup
+- the timer is used for periodic updates (not for initialization)
+
+Versioning rules used in this repository:
+- `0.0.x` = minor changes / fixes
+- `0.x.0` = big updates
+- `1.0.0` = stable release
 
 ---
 
 ## 📖 Documentation
 
 🇫🇷 Lire en français : [README FR](./docs/README.fr.md)  
+📄 Changelog : [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
@@ -70,7 +78,9 @@ Existing themes must be migrated to the new dark/light structure.
   - instant test without saving
 
 - ⏱️ **Automatic updates**
-  - via **systemd user timer**
+  - wallpaper is applied at **user login**
+  - periodic updates via **systemd user timer**
+  - instant refresh on GNOME light/dark changes (style hook)
   - fallback to cron if systemd is not available
 
 - 📍 **Geolocation during installation (optional)**
@@ -89,7 +99,7 @@ Existing themes must be migrated to the new dark/light structure.
 - ✅ GNOME (gsettings)
 - ✅ KDE Plasma (script support)
 - ✅ GTK3 (UI)
-- ✅ systemd user (optional but recommended)
+- ✅ systemd user (recommended)
 
 > The app automatically detects the environment (GNOME / KDE) and applies the wallpaper using the appropriate method.
 
@@ -107,7 +117,7 @@ Installer (best-effort):
 
 ---
 
-## 📁 Structure of projet
+## 📁 Structure of project
 
 ```
 .
@@ -164,7 +174,7 @@ Installer (best-effort):
 
 - Planning  
   ![planning](assets/screenshots/time.png)
-  
+
 - Géoloc  
   ![geoloc](assets/screenshots/geoloc.png)
 
@@ -177,7 +187,6 @@ Installer (best-effort):
 ---
 
 ## 📌 Installation
-
 
 ### 1) Clone the repo
 
@@ -196,16 +205,15 @@ chmod +x install.sh
 #### Useful options
 
 ```bash
-  --walldir <dir>         Wallpaper root directory
-  --minutes <n>           Timer frequency (systemd only) (default: 10)
-  --no-deps               Do not attempt to install dependencies (only checks + hints)
-  --force-templates       Overwrite existing templates files (default: copy missing only)
-  --debug                 Verbose mode
-  --no-geo                Do not attempt to detect geolocation during install
-
+--walldir <dir>         Wallpaper root directory
+--minutes <n>           Timer frequency (systemd only) (default: 10)
+--no-deps               Do not attempt to install dependencies (only checks + hints)
+--force-templates       Overwrite existing templates files (default: copy missing only)
+--debug                 Verbose mode
+--no-geo                Do not attempt to detect geolocation during install
 ```
 
-✅ An entry will appear in your applications : **Wallpaper Smart**
+✅ An entry will appear in your applications: **Wallpaper Smart**
 
 ---
 
@@ -217,7 +225,7 @@ Config file:
 ~/.config/wallpaper-smart/config.json
 ```
 
-Example :
+Example:
 
 ```json
 {
@@ -252,7 +260,6 @@ Example :
     "language": "system"
   }
 }
-
 ```
 
 ---
@@ -261,7 +268,7 @@ Example :
 
 Wallpaper Smart uses a strict and predictable structure to validate and load themes.
 
-### ✅ A theme is valid if :
+### ✅ A theme is valid if:
 
 - `templates/<theme>/dark/base/` exists
 - `templates/<theme>/light/base/` exists
@@ -271,10 +278,10 @@ Wallpaper Smart uses a strict and predictable structure to validate and load the
   - `coucher.png`
   - `nuit.png`
 
-- The base/ variant is ***mandatory***.
-- Additional variants (such as meteo/) are ***optional***.
+- The base/ variant is **mandatory**.
+- Additional variants (such as meteo/) are **optional**.
 
-Example :
+Example:
 
 ```
 templates/<theme>/
@@ -285,12 +292,15 @@ templates/<theme>/
 │       ├── coucher.png
 │       └── nuit.png
 │
-└── light/
-    └── base/
-        ├── aube.png
-        ├── midi.png
-        ├── coucher.png
-        └── nuit.png
+├── light/
+│   └── base/
+│       ├── aube.png
+│       ├── midi.png
+│       ├── coucher.png
+│       └── nuit.png
+│
+└── theme.json
+
 ```
 
 ### Weather (optional)
@@ -302,7 +312,7 @@ templates/<theme>/dark/meteo/<prefix>_<moment>.png
 templates/<theme>/light/meteo/<prefix>_<moment>.png
 ```
 
-Examples :
+Examples:
 
 ```
 templates/<theme>/
@@ -327,7 +337,6 @@ templates/<theme>/
         ├── <prefix>_aube.png
         ├── <prefix>_midi.png
         └── ...
-
 ```
 
 The `<prefix>` values are configured in the **Mapping** tab of the UI.
@@ -350,19 +359,25 @@ CONFIG_FILE="$HOME/.config/wallpaper-smart/config.json" ~/.local/bin/wallpaper-s
 
 ---
 
-## 🕒 systemd timer
+## 🕒 systemd services & timer
 
-The systemd user timer is:
+Wallpaper Smart uses systemd user units:
 
-- `wallpaper-smart.timer`
-- `wallpaper-smart.service`
+- `wallpaper-smart.service` (main service)
+- `wallpaper-smart.timer` (periodic updates)
+- `wallpaper-smart-style-hook.path` (detect GNOME style changes)
+- `wallpaper-smart-style-hook.service` (apply wallpaper on style change)
 
 Useful commands:
 
 ```bash
+systemctl --user status wallpaper-smart.service
 systemctl --user status wallpaper-smart.timer
+systemctl --user status wallpaper-smart-style-hook.path
+
 systemctl --user start wallpaper-smart.service
 systemctl --user start wallpaper-smart-style-hook.path
+
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 journalctl --user -u wallpaper-smart-style-hook.service -n 50 --no-pager
 ```
@@ -379,11 +394,12 @@ chmod +x uninstall.sh
 ### Useful options
 
 ```bash
-  --remove-config          Remove config directory (~/.config/wallpaper-smart)
-  --remove-wallpapers      Remove wallpapers templates directory (templates/...) inside --wallpapers-dir
-  --wallpapers-dir DIR     Wallpapers root directory (same as wallpaper_dir in config.json)
-  -h, --help               Show help
+--remove-config          Remove config directory (~/.config/wallpaper-smart)
+--remove-wallpapers      Remove wallpapers templates directory (templates/...) inside --wallpapers-dir
+--wallpapers-dir DIR     Wallpapers root directory (same as wallpaper_dir in config.json)
+-h, --help               Show help
 ```
+
 ---
 
 ## 🗺️ Roadmap
@@ -399,7 +415,7 @@ chmod +x uninstall.sh
 - [x] Allow dark and light theme management for wallpapers
 - [ ] Advanced theme management (preview + import/export)
 - [ ] Advanced scheduling: add minute support for time slots (dawn / noon / sunset / night)
-- [X] UI improvement (wallpaper status): when a weather image is missing, display a warning icon 
+- [x] UI improvement (wallpaper status): when a weather image is missing, display a warning icon
 
 ---
 
@@ -420,6 +436,7 @@ chmod +x uninstall.sh
 ```bash
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 ```
+
 ---
 
 ## ❤️ Support the project

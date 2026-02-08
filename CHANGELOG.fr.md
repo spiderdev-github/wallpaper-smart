@@ -1,162 +1,159 @@
 # Changelog
 
-🇬🇧 **English version**: [CHANGELOG.md](CHANGELOG.md)
+🇬🇧 **English version** : [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
-## [2.0.0] - 2026-02-05
-### 🚀 Mise à jour majeure – Intégration du style desktop (clair / sombre)
+## [1.0.0] - 2026-02-07
+### 🎉 Première version stable – prête pour la production
 
-### Added
-- Changement automatique du fond d’écran selon le style du desktop GNOME (clair / sombre)
-- Réaction instantanée aux changements de style (mécanisme event-driven)
-- Ajout de nouveaux fichiers systemd user :
+### Ajouts
+- Interface de configuration GTK3 complète
+- Gestion dynamique du fond d’écran basée sur :
+  - le moment de la journée (aube / midi / coucher / nuit)
+  - la météo en temps réel (Open-Meteo)
+- Support multilingue (fr/en/de/es/ar/ru/zh)
+- Gestion de la géolocalisation :
+  - détection automatique lors de l’installation
+  - mode « Ville » avec récupération latitude / longitude (OpenStreetMap / Nominatim)
+  - emplacements prédéfinis avec icônes météo indicatives
+- Mécanisme d’état du fond d’écran courant :
+  - stockage du dernier fond appliqué dans  
+    `~/.config/wallpaper-smart/wallpaper/current.json`
+  - application du fond **uniquement s’il est différent**
+- Indicateurs visuels d’avertissement ⚠️ dans le tableau de bord lorsque :
+  - aucun fond météo correspondant n’est disponible
+  - un repli vers une image de base ou aucun fond valide n’est trouvé
+- Affichage de la version de l’application dans l’en-tête de l’interface
+- Onglet « À propos » avec présentation du projet, version, licence et liens de support
+
+### Modifications
+- **Comportement systemd finalisé** :
+  - les services démarrent désormais **immédiatement à la connexion utilisateur**
+  - le fond d’écran est appliqué au démarrage de la session sans attendre le timer
+- Mise à jour des fichiers `.service` :
+  - ordre de démarrage corrigé
+  - exécution fiable à la connexion
+- Installateur mis à jour :
+  - services activés et démarrés dès l’installation
+  - suppression de l’initialisation différée par le timer
+- Amélioration des aperçus dans l’interface :
+  - les blocs d’images de base et météo utilisent la même logique
+  - rafraîchissement cohérent et gestion uniforme des fallbacks
+- Amélioration du format des messages d’erreur et d’état :
+  - messages sur plusieurs lignes pour une meilleure lisibilité
+  - séparation claire entre icône, chemin et description
+- Optimisation majeure de `wallpaper-smart.sh` :
+  - réduction des applications de fond d’écran redondantes
+  - diminution des appels GNOME / KDE
+  - meilleure stabilité sur les longues sessions
+
+### Corrections
+- Fond d’écran non appliqué au démarrage de la session
+- Rafraîchissement incohérent entre les aperçus base et météo
+- Cas limites liés au timer provoquant des mises à jour manquées
+- Problèmes d’interface dus aux messages d’erreur sur une seule ligne
+- Problèmes de démarrage des services nécessitant auparavant le lancement de l’UI ou un redémarrage
+
+---
+
+## [0.4.0] - 2026-02-05
+### 🚀 Mise à jour majeure – intégration du style du bureau (clair / sombre)
+
+### Ajouts
+- Changement automatique du fond d’écran selon le style GNOME (clair / sombre)
+- Réaction instantanée aux changements de style (mécanisme événementiel)
+- Nouveaux fichiers systemd utilisateur :
   - `wallpaper-smart-style-hook.path`
   - `wallpaper-smart-style-hook.service`
   - `wallpaper-smart-on-style-change.sh`
-- Intégration complète du paramètre GNOME `color-scheme`
-- Rafraîchissement du fond d’écran en temps réel, sans dépendre du timer
+- Intégration complète avec le paramètre GNOME `color-scheme`
+- Rafraîchissement du fond d’écran en temps réel sans dépendre du timer
 
-### Changed
-- **Changement incompatible** : nouvelle structure obligatoire des templates :
+### Modifications
+- **Changement cassant** : nouvelle structure de templates obligatoire :
   - `templates/<theme>/dark/base/`
   - `templates/<theme>/light/base/`
 - Le dossier `base/` est désormais requis pour **chaque style**
-- Le dossier `meteo/` est maintenant résolu par style (clair / sombre)
-- Refonte complète de la logique de résolution des fonds d’écran :
+- Le dossier `meteo/` est désormais résolu par style (clair / sombre)
+- Réécriture complète de la logique de résolution des fonds :
   - style → moment de la journée → météo → fallback
 - Amélioration de la validation des templates et des mécanismes de repli
 - Documentation et README mis à jour pour refléter la nouvelle structure
 
-### Removed
-- Suppression du support de l’ancienne structure :
+### Suppressions
+- Suppression du support de l’ancienne structure de templates :
   - `templates/<theme>/base/`
 
-### Fixed
-- Cas limites où le fond d’écran ne se mettait pas à jour lors d’un changement de style
-- Comportements incohérents lors de bascules rapides clair ↔ sombre
+### Corrections
+- Cas limites où le fond d’écran n’était pas rafraîchi après un changement de style
+- Comportement incohérent lors de bascules rapides entre clair et sombre
 
 ---
 
-## [1.3.1] - 2026-02-05
-### Added
-- Mécanisme d’état du fond d’écran courant :
-  - stockage du dernier wallpaper appliqué dans `~/.config/wallpaper-smart/wallpaper/current.json`
-  - comparaison entre le fond d’écran courant et le prochain à appliquer
-  - application du fond d’écran uniquement si celui-ci est différent
-- Affichage de la version de l’application dans le header de l’UI
-  - facilite le support, le debug et les retours utilisateurs
+## [0.3.1] - 2026-02-05
+### Ajouts
+- Affichage de la version de l’application dans l’en-tête de l’interface
 - Alerte utilisateur lors du changement de langue :
   - message affiché dans la langue sélectionnée
-  - indication claire qu’un enregistrement suivi d’un redémarrage de l’application est requis
-- Indicateur visuel ⚠️ dans le dashboard lorsque :
-  - aucun fond d’écran météo correspondant n’est disponible
-  - fallback sur une image de base ou absence de fond valide
+  - indication claire qu’un enregistrement et un redémarrage sont nécessaires
 
-### Changed
-- Optimisation majeure du script `wallpaper-smart.sh` :
-  - suppression des applications redondantes du fond d’écran
-  - réduction drastique des appels GNOME / KDE
-  - amélioration de la stabilité sur les sessions longues
-- Fréquence du timer désormais fiable même à **1 minute**
-  - sans blocage
-  - sans perte d’application du fond d’écran
-- Amélioration du comportement du service systemd user :
-  - fonctionnement correct dès le démarrage du système
-  - plus besoin de lancer l’UI pour initialiser le fond d’écran
+### Modifications
+- Optimisation de `wallpaper-smart.sh` :
+  - suppression des applications de fond redondantes
+  - réduction des appels GNOME / KDE
+- Amélioration du comportement du service systemd utilisateur :
+  - fonctionnement correct au démarrage du système
+  - l’interface n’a plus besoin d’être lancée pour initialiser le fond d’écran
 
-### Fixed
-- Correctif critique : bug où le fond d’écran cessait de s’appliquer après plusieurs changements successifs
-  - nécessitait auparavant un redémarrage du PC
-- Correction du fichier `wallpaper-smart.service` :
-  - ajout des valeurs manquantes empêchant le démarrage automatique
-- Correctifs de cohérence UI :
-  - dashboard désormais aligné avec l’état réel du fond d’écran appliqué
-  - meilleure lisibilité des erreurs liées aux fonds manquants
+### Corrections
+- Problème critique où le fond d’écran cessait de se mettre à jour après plusieurs changements successifs
+- Correction de `wallpaper-smart.service` :
+  - ajout de valeurs manquantes empêchant le démarrage automatique
+- Le tableau de bord reflète désormais correctement l’état réel du fond appliqué
 
 ---
 
-## [1.3.0] - 2026-02-04
-### Added
-- Support multi-langue (fr/en/de/es/ar/ru/zh) via fichiers JSON dans `lang/`
-- Sélection de la langue dans l’UI (onglet Général) avec sauvegarde dans `config.json`
-- Géolocalisation à l’installation (définition automatique des valeurs par défaut) avec option `--no-geo`
-- Mode de géolocalisation « Ville » :
-  - saisie d’une ville
-  - récupération des coordonnées lat/lon via Nominatim (OpenStreetMap)
-- Presets de localisation (capitales) :
-  - sélection rapide
-  - affichage d’une icône météo en temps réel (indicatif)
-- Météo en temps réel sur les presets (indicateur visuel)
-- Onglet « À propos » :
-  - présentation du projet
-  - version
-  - licence
-  - liens (PayPal / BuyMeACoffee)
+## [0.3.0] - 2026-02-04
+### Ajouts
+- Support multilingue via des fichiers JSON dans `lang/`
+- Sélection de la langue dans l’interface avec persistance dans `config.json`
+- Mode de géolocalisation « Ville » avec récupération via Nominatim
+- Emplacements prédéfinis (capitales) avec icônes météo indicatives
+- Onglet « À propos » avec informations projet et liens de support
 
-### Changed
-- Nouvelle arborescence des wallpapers :
+### Modifications
+- Nouvelle structure des templates de fond d’écran :
   - `templates/<theme>/base/` → aube.png, midi.png, coucher.png, nuit.png
   - `templates/<theme>/meteo/` → `<prefix>_<moment>.png`
-- UI améliorée (ergonomie géolocalisation, presets, actions rapides)
-- Processus d’installation amélioré :
-  - création et mise à jour automatique du `config.json`
+- Amélioration du processus d’installation :
+  - création et mise à jour automatiques de `config.json`
   - ajout d’une géolocalisation par défaut lors de l’installation
-  - copie des templates plus robuste (rsync ou fallback cp)
 
-### Fixed
-- Correctifs UI / GTK (stabilité générale et rafraîchissement)
-- Correction du curseur « main/pointer » sur les ComboBox sans crash GTK
-- Correction du survol :
-  - le curseur ne s’applique plus à un bloc externe
-  - uniquement sur le champ select
+### Corrections
+- Problèmes de stabilité UI / GTK
+- Comportement du curseur et du survol des ComboBox
 
 ---
 
-## [1.2.0] - 2026-02-04
-### Added
-- Amélioration des presets de géolocalisation (meilleure sélection)
-- Détection météo (Open-Meteo) pour afficher une icône indicative dans la liste des presets
-- Boutons UI « vider » et « rechercher lat/lon » pour la saisie ville
+## [0.2.0] - 2026-02-04
+### Ajouts
+- Amélioration des emplacements de géolocalisation prédéfinis
+- Détection météo (Open-Meteo) pour affichage d’icônes indicatives
+- Boutons UI pour la recherche de ville et l’effacement des champs
 
-### Changed
-- UI localisation plus intuitive (modes et champs mieux gérés)
-- Rafraîchissement du dashboard plus stable
+### Modifications
+- Interface de localisation plus intuitive
+- Rafraîchissement du tableau de bord plus stable
 
-### Fixed
-- Désactivation de `preset_combo` lorsque le mode = city
-- Correctifs de focus UI (orange / hover)
-
----
-
-## [1.1.0] - 2026-02-03
-### Added
-- Introduction du mode « city » (ville) dans l’UI
-- Mapping météo → préfixes plus clair
-- Améliorations de l’onglet Images :
-  - placeholders
-  - previews
-  - ouverture des dossiers base/ et meteo/
-
-### Changed
-- Amélioration de la logique de configuration et de la sauvegarde
-
----
-
-## [1.0.0] - 2026-02-02
-### Added
-- Première version stable
-- UI GTK3 (configuration)
-- Script principal `wallpaper-smart.sh`
-- Service et timer systemd user
-- Configuration via `~/.config/wallpaper-smart/config.json`
-- Gestion des fonds d’écran selon l’heure (aube / midi / coucher / nuit)
-- Météo via Open-Meteo avec mapping configurable
-- Templates de wallpapers (base + meteo)
+### Corrections
+- Désactivation de la sélection des presets lorsque le mode ville est actif
+- Corrections du focus et du survol de l’interface
 
 ---
 
 ## [0.1.0] - 2026-01-30
-### Added
+### Ajouts
 - Début du projet Wallpaper Smart
-- Base du concept : fond d’écran dynamique selon l’heure et la météo
+- Concept principal : fond d’écran dynamique basé sur le moment de la journée et la météo
+- Scripts initiaux, logique de configuration et templates prototypes

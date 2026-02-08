@@ -1,84 +1,108 @@
 # Wallpaper Smart
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Linux-blue)
-![Desktop](https://img.shields.io/badge/desktop-GNOME%20%7C%20KDE-orange)
+[![Licence : MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Plateforme](https://img.shields.io/badge/platform-Linux-blue)
+![Bureau](https://img.shields.io/badge/desktop-GNOME%20%7C%20KDE-orange)
 ![GTK](https://img.shields.io/badge/GTK-3.x-purple)
 
-Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le fond d’écran selon :
+Wallpaper Smart est une application Linux (GNOME / KDE) qui change automatiquement le fond d’écran en fonction :
 
-✅ l’heure de la journée (aube / midi / coucher / nuit)  
-✅ la météo en temps réel (Open-Meteo)  
-✅ un système de thèmes via des templates  
-✅ une interface GTK simple et moderne pour gérer la configuration
+✅ du moment de la journée (aube / midi / coucher / nuit)  
+✅ de la météo en temps réel (Open-Meteo)  
+✅ d’un système de thèmes basé sur des templates  
+✅ d’une interface GTK simple et moderne pour gérer les paramètres  
 
 ---
 
 ## 🚀 Version
 
-**v1.1.0**
+**v1.0.0 (stable)**
+
+Wallpaper Smart est prêt pour la production :
+- les services démarrent **à la connexion utilisateur**
+- le fond d’écran est appliqué immédiatement au démarrage de la session
+- le timer est utilisé uniquement pour les mises à jour périodiques (pas pour l’initialisation)
+
+Règles de versioning utilisées dans ce dépôt :
+- `0.0.x` = modifications mineures / correctifs
+- `0.x.0` = mises à jour majeures
+- `1.0.0` = version stable
 
 ---
 
 ## 📖 Documentation
 
-🇬🇧 Read in English : [README EN](../README.md)
+🇬🇧 Read in English : [README.md](README.md)  
+📄 Journal des modifications : [CHANGELOG.fr.md](CHANGELOG.md)
 
 ---
 
-## ✨ Fonctionnalités (principales)
+## ✨ Fonctionnalités principales
 
-- 🌗 **Fond d’écran dynamique par moment**
+- 🌗 **Fond d’écran dynamique selon le moment de la journée**
   - aube / midi / coucher / nuit
+  - sélection automatique selon l’heure locale
 
 - 🌦️ **Météo en temps réel**
-  - clear / cloudy / fog / rain / snow / thunder
-  - mapping configurable (`clair`, `nuageux`, etc.)
+  - clair / nuageux / brouillard / pluie / neige / orage
+  - mapping météo configurable
+  - repli automatique vers les images `base/` en l’absence de correspondance météo
 
-- 🎨 **Thèmes de wallpapers (templates)**
-  - gestion via `templates/<theme>/...`
-  - sélection du thème dans l’UI
-  - validation automatique d’un thème (base + 4 images minimum)
+- 🎨 **Thèmes de fond d’écran (templates)**
+  - gérés via `templates/<theme>/<style>/...`
+  - détection automatique du style **clair / sombre** (GNOME)
+  - variante `base/` **obligatoire**, `meteo/` **optionnelle**
+  - validation automatique des thèmes (structure + images requises)
+  - sélection du thème via l’interface
+
+- 🌓 **Intégration du style du bureau (GNOME)**
+  - bascule automatique entre fonds **clair** et **sombre**
+  - réaction instantanée aux changements de style GNOME
+  - basé sur **systemd user path + service**
+  - aucune action utilisateur requise
 
 - 📍 **Localisation**
   - géolocalisation par IP (**auto_ip**)
   - mode manuel (**fixed**)
-  - mode **Ville** avec recherche lat/lon via OpenStreetMap (**Nominatim**)
-  - presets “grandes capitales” avec **icône météo en temps réel**
+  - mode **Ville** avec recherche latitude / longitude via OpenStreetMap (**Nominatim**)
+  - presets de grandes capitales avec icône météo en temps réel
 
-- 🌍 **Multi‑langue (UI)**
-  - Français, Anglais, Allemand, Espagnol, Arabe, Russe, Chinois  
-  *(selon les fichiers disponibles dans `lang/`)*
+- 🌍 **Interface multilingue**
+  - Français, Anglais, Allemand, Espagnol, Arabe, Russe, Chinois
+  - (selon les fichiers disponibles dans `lang/`)
 
 - 🖥️ **Interface GTK (Wallpaper Smart UI)**
   - aperçu des images
   - sélection rapide des fichiers
-  - activation/désactivation par image météo
-  - test immédiat sans sauvegarder
+  - activation / désactivation des images météo
+  - test instantané sans sauvegarde
 
-- ⏱️ **Mise à jour automatique**
-  - via **systemd user timer** (si disponible)
-  - sinon possibilité de planifier via cron
+- ⏱️ **Mises à jour automatiques**
+  - le fond est appliqué **à la connexion utilisateur**
+  - mises à jour périodiques via **systemd user timer**
+  - rafraîchissement instantané lors des changements clair/sombre GNOME
+  - repli possible vers cron si systemd n’est pas disponible
 
-- 📍 **Géolocalisation à l’installation (optionnel)**
-  - détecte une localisation par défaut lors du `install.sh`
+- 📍 **Géolocalisation à l’installation (optionnelle)**
+  - détection automatique d’une position par défaut lors de `install.sh`
   - désactivable avec `--no-geo`
 
-- ℹ️ **Section “À propos”**
-  - infos du projet + liens
-  - liens pour dons (PayPal / BuyMeACoffee)
+- ℹ️ **Section À propos**
+  - informations sur le projet
+  - liens utiles
+  - liens de dons (PayPal / BuyMeACoffee)
 
 ---
 
 ## 🧩 Compatibilité
 
-- ✅ Linux (multi‑distributions)
+- ✅ Linux (plusieurs distributions)
 - ✅ GNOME (gsettings)
-- ✅ KDE Plasma (support via script)
-- ✅ GTK3 (UI)
-- ✅ systemd user (optionnel mais recommandé)
+- ✅ KDE Plasma (support par script)
+- ✅ GTK3 (interface)
+- ✅ systemd user (recommandé)
 
-> L'application detecte automatiquement l'environnement (GNOME / KDE) et applique le wallpaper via la methode adaptee.
+> L’application détecte automatiquement l’environnement (GNOME / KDE) et applique le fond d’écran avec la méthode appropriée.
 
 ---
 
@@ -86,11 +110,11 @@ Wallpaper Smart est une application Linux (GNOME) qui change automatiquement le 
 
 Installateur (best-effort) :
 
-- `bash`, `curl`, `jq`
+- `git`, `bash`, `curl`, `jq`
 - `python3`
-- `python3-gi` + GTK3 + Cairo (selon distro)
+- `python3-gi` + GTK3 + Cairo (selon la distribution)
 - `xdg-utils`
-- KDE : `qdbus` ou `qdbus-qt5` (selon distribution)
+- KDE : `qdbus` ou `qdbus-qt5` (selon la distribution)
 
 ---
 
@@ -105,21 +129,35 @@ Installateur (best-effort) :
 │   ├── wallpaper-smart-ui
 │   ├── wallpaper-smart.service
 │   ├── wallpaper-smart.timer
-│   └── wallpaper-smart-mkplaceholders.sh
+│   ├── wallpaper-smart-mkplaceholders.sh
+│   ├── wallpaper-smart-on-style-change.sh
+│   ├── wallpaper-smart-style-hook.service
+│   └── wallpaper-smart-style-hook.path
+│
 ├── wallpaper/
 │   └── templates/
 │       └── default/
-│       │   ├── base/
-│       │   │   ├── aube.png
-│       │   │   ├── midi.png
-│       │   │   ├── coucher.png
-│       │   │   └── nuit.png
-│       │   └── meteo/
-│       │       ├── clair_aube.png
-│       │       ├── clair_midi.png
-│       │       └── ...
-│       │
-│       └── ...
+│           ├── dark/
+│           │   ├── base/        # Obligatoire
+│           │   │   ├── aube.png
+│           │   │   ├── midi.png
+│           │   │   ├── coucher.png
+│           │   │   └── nuit.png
+│           │   └── meteo/       # Optionnel
+│           │       ├── clair_aube.png
+│           │       ├── clair_midi.png
+│           │       └── ...
+│           │
+│           └── light/
+│               ├── base/        # Obligatoire
+│               │   ├── aube.png
+│               │   ├── midi.png
+│               │   ├── coucher.png
+│               │   └── nuit.png
+│               └── meteo/       # Optionnel
+│                   ├── clair_aube.png
+│                   ├── clair_midi.png
+│                   └── ...
 │
 └── lang/
     ├── en_US.json
@@ -128,30 +166,30 @@ Installateur (best-effort) :
     └── ...
 ```
 
-## 📸 Screenshots
+## 📸 Captures d’écran
 
-> Ajoute tes screenshots dans `assets/screenshots/` puis adapte les liens ici.
+> Ajoute tes captures d’écran dans `assets/screenshots/` puis mets à jour les liens ici.
 
 - Général  
-  ![General](assets/screenshots/general.png)
+  ![general](assets/screenshots/general.png)
 
 - Planning  
   ![planning](assets/screenshots/time.png)
-  
+
 - Géoloc  
-  ![Geoloc](assets/screenshots/geoloc.png)
+  ![geoloc](assets/screenshots/geoloc.png)
 
 - Mapping  
-  ![Mapping](assets/screenshots/mapping.png)
+  ![mapping](assets/screenshots/mapping.png)
 
 - Images  
-  ![Images](assets/screenshots/images.png)
+  ![images](assets/screenshots/images.png)
 
 ---
 
 ## 📌 Installation
 
-### 1) Cloner le repo
+### 1) Cloner le dépôt
 
 ```bash
 git clone https://github.com/spiderdev-github/wallpaper-smart.git
@@ -168,22 +206,21 @@ chmod +x install.sh
 #### Options utiles
 
 ```bash
-  --walldir <chemin>      Répertoire racine des fonds d’écran
-  --minutes <n>           Fréquence du timer (systemd uniquement) (défaut : 10)
-  --no-deps               Ne pas essayer d’installer les dépendances (vérifications + conseils uniquement)
-  --force-templates       Écraser les fichiers de templates existants (défaut : copie uniquement les fichiers manquants)
-  --debug                 Mode verbeux
-  --no-geo                Ne pas tenter de détecter la géolocalisation pendant l’installation
-
+--walldir <dir>         Répertoire racine des fonds d’écran
+--minutes <n>           Fréquence du timer (systemd uniquement) (défaut : 10)
+--no-deps               Ne pas tenter d’installer les dépendances (vérifications + conseils uniquement)
+--force-templates       Écraser les fichiers templates existants (défaut : copie uniquement ce qui manque)
+--debug                 Mode verbeux
+--no-geo                Ne pas tenter de détecter la géolocalisation lors de l’installation
 ```
 
-✅ Une entrée apparaîtra dans tes applications : **Wallpaper Smart**
+✅ Une entrée apparaîtra dans vos applications : **Wallpaper Smart**
 
 ---
 
 ## ⚙️ Configuration
 
-Fichier de config :
+Fichier de configuration :
 
 ```bash
 ~/.config/wallpaper-smart/config.json
@@ -203,8 +240,11 @@ Exemple :
   },
   "geolocation": {
     "mode": "fixed",
-    "fixed": { "lat": 48.5839, "lon": 7.7455 },
-    "city_name": "Strasbourg",
+    "fixed": {
+      "lat": 48.8566,
+      "lon": 2.3522
+    },
+    "city_name": "Paris",
     "preset": "none"
   },
   "weather_mapping": {
@@ -215,10 +255,10 @@ Exemple :
     "snow": "neige",
     "thunder": "orage"
   },
-  "timer_minutes": 10,
+  "timer_minutes": 5,
   "enabled_images": {},
   "ui": {
-    "language": "fr_FR"
+    "language": "system"
   }
 }
 ```
@@ -227,48 +267,87 @@ Exemple :
 
 ## 🎨 Templates & thèmes
 
-Wallpaper Smart utilise une structure stricte pour valider un thème.
+Wallpaper Smart utilise une structure stricte et prévisible pour valider et charger les thèmes.
 
 ### ✅ Un thème est valide si :
 
-- `templates/<theme>/base/` existe
-- et contient au minimum :
+- `templates/<theme>/dark/base/` existe
+- `templates/<theme>/light/base/` existe
+- chaque dossier `base/` contient au minimum :
   - `aube.png`
   - `midi.png`
   - `coucher.png`
   - `nuit.png`
 
+- La variante `base/` est **obligatoire**.
+- Les variantes supplémentaires (comme `meteo/`) sont **optionnelles**.
+
 Exemple :
 
 ```
-templates/default/base/aube.png
-templates/default/base/midi.png
-templates/default/base/coucher.png
-templates/default/base/nuit.png
+templates/<theme>/
+├── dark/
+│   └── base/
+│       ├── aube.png
+│       ├── midi.png
+│       ├── coucher.png
+│       └── nuit.png
+│
+├── light/
+│   └── base/
+│       ├── aube.png
+│       ├── midi.png
+│       ├── coucher.png
+│       └── nuit.png
+│
+└── theme.json
+
 ```
 
-### Météo (optionnel)
+### Météo (optionnelle)
 
 Si tu veux activer la météo :
 
 ```
-templates/<theme>/meteo/<prefix>_<moment>.png
+templates/<theme>/dark/meteo/<prefix>_<moment>.png
+templates/<theme>/light/meteo/<prefix>_<moment>.png
 ```
 
 Exemples :
 
 ```
-templates/default/meteo/pluie_aube.png
-templates/default/meteo/pluie_midi.png
-templates/default/meteo/pluie_coucher.png
-templates/default/meteo/pluie_nuit.png
+templates/<theme>/
+├── dark/
+│   ├── base/        # Obligatoire
+│   │   ├── aube.png
+│   │   ├── midi.png
+│   │   ├── coucher.png
+│   │   └── nuit.png
+│   └── meteo/       # Optionnel
+│       ├── <prefix>_aube.png
+│       ├── <prefix>_midi.png
+│       └── ...
+│
+├── light/
+│   ├── base/        # Obligatoire
+│   │   ├── aube.png
+│   │   ├── midi.png
+│   │   ├── coucher.png
+│   │   └── nuit.png
+│   └── meteo/       # Optionnel
+│       ├── <prefix>_aube.png
+│       ├── <prefix>_midi.png
+│       └── ...
+│
+└── theme.json
+
 ```
 
-Les `<prefix>` sont configurés dans l’onglet **Mapping** de l’UI.
+Les valeurs `<prefix>` se configurent dans l’onglet **Mapping** de l’interface.
 
 ---
 
-## ▶️ Lancer l'application
+## ▶️ Lancer l’application
 
 ```bash
 ~/.local/bin/wallpaper-smart-ui
@@ -284,19 +363,27 @@ CONFIG_FILE="$HOME/.config/wallpaper-smart/config.json" ~/.local/bin/wallpaper-s
 
 ---
 
-## 🕒 Timer systemd
+## 🕒 Services systemd & timer
 
-Le timer systemd user est :
+Wallpaper Smart utilise des unités systemd utilisateur :
 
-- `wallpaper-smart.timer`
-- `wallpaper-smart.service`
+- `wallpaper-smart.service` (service principal)
+- `wallpaper-smart.timer` (mises à jour périodiques)
+- `wallpaper-smart-style-hook.path` (détecte les changements de style GNOME)
+- `wallpaper-smart-style-hook.service` (applique le fond au changement de style)
 
 Commandes utiles :
 
 ```bash
+systemctl --user status wallpaper-smart.service
 systemctl --user status wallpaper-smart.timer
+systemctl --user status wallpaper-smart-style-hook.path
+
 systemctl --user start wallpaper-smart.service
+systemctl --user start wallpaper-smart-style-hook.path
+
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
+journalctl --user -u wallpaper-smart-style-hook.service -n 50 --no-pager
 ```
 
 ---
@@ -312,33 +399,34 @@ chmod +x uninstall.sh
 
 ```bash
 --remove-config          Supprimer le dossier de configuration (~/.config/wallpaper-smart)
-  --remove-wallpapers      Supprimer le dossier des templates de wallpapers (templates/...) dans --wallpapers-dir
-  --wallpapers-dir DIR     Dossier racine des wallpapers (identique à wallpaper_dir dans config.json)
-  -h, --help               Afficher l’aide
+--remove-wallpapers      Supprimer le dossier des templates (templates/...) dans --wallpapers-dir
+--wallpapers-dir DIR     Répertoire racine des fonds d’écran (comme wallpaper_dir dans config.json)
+-h, --help               Afficher l’aide
 ```
+
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Feuille de route
 
-- [x] Ajouter une section « À propos » dans l’interface
-- [x] Ajouter un bouton « Don »
-- [x] Améliorer les logs (interface plus lisible)
-- [x] Support de KDE Plasma
-- [x] Météo en temps réel pour les localisations prédéfinies
-- [x] Ajouter la gestion multilingue
-- [x] Détecter la géolocalisation à l’installation pour définir la latitude/longitude par défaut (opetion désactivable)
-- [x] Section géolocalisation : en mode « Ville », récupérer la latitude/longitude à partir de la ville saisie
-- [ ] Permettre la gestion des thèmes sombre et clair pour les fonds d’écran
+- [x] Ajout d’une section « À propos » dans l’interface
+- [x] Ajout d’un bouton « Faire un don »
+- [x] Amélioration des logs (interface plus lisible)
+- [x] Support KDE Plasma
+- [x] Météo en temps réel pour les presets
+- [x] Support multilingue
+- [x] Détection de la géolocalisation à l’installation (optionnel)
+- [x] Géolocalisation : en mode « Ville », récupérer lat/lon à partir de la ville saisie
+- [x] Gestion des fonds clair / sombre
 - [ ] Gestion avancée des thèmes (aperçu + import/export)
-- [ ] Permetre de planifier moment avec minutes 
-- [ ] Planification avancée : ajout des minutes pour les horaires (aube / midi / coucher / nuit)
-- [X] Amélioration UI: si une image météo est manquante, afficher une icône d’avertissement à la place de l’icône photo dans Dernier fond
+- [ ] Planification avancée : ajouter le support des minutes (aube / midi / coucher / nuit)
+- [x] Amélioration UI (statut du fond) : afficher une icône d’avertissement si une image météo manque
+
 ---
 
 ## ❓ FAQ
 
-### Pourquoi le wallpaper ne change pas ?
-- Verifie que le timer est actif :
+### Pourquoi le fond d’écran ne change pas ?
+- Vérifie que le timer est actif :
   ```bash
   systemctl --user status wallpaper-smart.timer
   ```
@@ -346,9 +434,9 @@ chmod +x uninstall.sh
   ```bash
   ~/.local/bin/wallpaper-smart.sh
   ```
-- Essaye d'activer/désactiver le style claire/sombre de ton OS
+- Essaie d’activer/désactiver le mode clair/sombre de ton OS
 
-### Ou sont les logs ?
+### Où sont les logs ?
 ```bash
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 ```
@@ -357,28 +445,30 @@ journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 
 ## ❤️ Soutenir le projet
 
-Si Wallpaper Smart vous aide au quotidien, vous pouvez soutenir le projet :
+Si Wallpaper Smart t’aide au quotidien, tu peux soutenir le projet :
 
 - PayPal : https://www.paypal.com/paypalme/lalsarok1
 - Buy Me a Coffee : https://buymeacoffee.com/spiderdev
-- Site : https://spiderdev.fr
+- Site web : https://spiderdev.fr
+
+---
 
 ## 🤝 Contribuer
 
-Les contributions sont bienvenues !
+Les contributions sont les bienvenues !
 
 - forks + PR
-- amelioration UI
-- nouveaux themes wallpapers
-- support multi-desktop (KDE etc.)
+- améliorations UI
+- nouveaux thèmes de fonds d’écran
+- support multi-bureaux (KDE, etc.)
 
 ---
 
 ## ⭐ Remerciements
 
 - **GTK / GNOME**
-- **Open-Meteo API**
-- **systemd user services**
+- **API Open-Meteo**
+- **Services systemd utilisateur**
 - Ptifiela
 - et tous les futurs contributeurs ❤️
 
@@ -386,5 +476,5 @@ Les contributions sont bienvenues !
 
 ## 🛡️ Licence
 
-MIT License © SpiderDev  
+Licence MIT © SpiderDev  
 Voir le fichier [LICENSE](LICENSE).

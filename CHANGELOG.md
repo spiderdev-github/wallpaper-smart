@@ -4,13 +4,66 @@
 
 ---
 
-## [2.0.0] - 2026-02-05
+## [1.0.0] - 2026-02-07
+### 🎉 First stable release – production ready
+
+### Added
+- Full GTK3 configuration UI
+- Dynamic wallpaper management based on:
+  - time of day (dawn / noon / sunset / night)
+  - real-time weather (Open-Meteo)
+- Multi-language support (fr/en/de/es/ar/ru/zh)
+- Geolocation support:
+  - automatic detection during installation
+  - city mode with latitude / longitude lookup (OpenStreetMap / Nominatim)
+  - preset locations with indicative weather icons
+- Current wallpaper state mechanism:
+  - storage of the last applied wallpaper in  
+    `~/.config/wallpaper-smart/wallpaper/current.json`
+  - wallpaper is applied **only if different**
+- Visual warning indicators ⚠️ in the dashboard when:
+  - no matching weather wallpaper is available
+  - fallback to base image or no valid wallpaper is found
+- Application version displayed in the UI header
+- “About” tab with project presentation, version, license, and support links
+
+### Changed
+- **Systemd startup behavior finalized**:
+  - services now start **immediately at user login**
+  - wallpaper is applied at session startup without waiting for the timer
+- Updated `.service` files:
+  - correct startup ordering
+  - reliable execution at login
+- Installer updated accordingly:
+  - services are enabled and started during installation
+  - no delayed initialization via timer
+- Improved UI previews:
+  - base and weather image blocks now share the same logic
+  - consistent refresh behavior and fallback handling
+- Improved error and status message formatting:
+  - multi-line messages for better readability
+  - clearer separation between icon, path, and error description
+- Major optimization of `wallpaper-smart.sh`:
+  - reduced redundant wallpaper applications
+  - fewer GNOME / KDE calls
+  - improved long-session stability
+
+### Fixed
+- Wallpaper not applied at session startup
+- Inconsistent preview refresh between base images and weather images
+- Timer-related edge cases causing missed wallpaper updates
+- UI inconsistencies caused by long single-line error messages
+- Service startup issues previously requiring UI launch or system reboot
+
+---
+
+## [0.4.0] - 2026-02-05
 ### 🚀 Major update – Desktop style integration (dark / light)
 
 ### Added
 - Automatic wallpaper switching based on GNOME desktop style (dark / light)
 - Instant reaction to desktop style changes (event-driven mechanism)
-- Added new systemd user files:
+- New systemd user files:
   - `wallpaper-smart-style-hook.path`
   - `wallpaper-smart-style-hook.service`
   - `wallpaper-smart-on-style-change.sh`
@@ -38,119 +91,64 @@
 
 ---
 
-## [1.3.1] - 2026-02-05
+## [0.3.1] - 2026-02-05
 ### Added
-- Current wallpaper state mechanism:
-  - storage of the last applied wallpaper in `~/.config/wallpaper-smart/wallpaper/current.json`
-  - comparison between the current wallpaper and the next one to apply
-  - wallpaper is applied only if it is different
 - Application version displayed in the UI header
-  - improves support, debugging, and user feedback
 - User alert when changing language:
   - message displayed in the selected language
-  - clear indication that saving + application restart is required
-- Visual warning indicator ⚠️ in the dashboard when:
-  - no matching weather wallpaper is available
-  - fallback to a base image or no valid wallpaper is found
+  - clear indication that saving and application restart are required
 
 ### Changed
-- Major optimization of `wallpaper-smart.sh` script:
+- Optimized `wallpaper-smart.sh`:
   - removal of redundant wallpaper applications
-  - drastic reduction of GNOME / KDE calls
-  - improved stability during long sessions
-- Timer frequency is now reliable even at **1 minute**
-  - no blocking
-  - no wallpaper application loss
+  - reduced GNOME / KDE calls
 - Improved systemd user service behavior:
   - service now works correctly at system startup
   - UI no longer needs to be launched to initialize the wallpaper
 
 ### Fixed
-- Critical fix: wallpaper stopped updating after multiple successive changes
-  - previously required a system reboot
+- Critical issue where wallpaper stopped updating after multiple successive changes
 - Fixed `wallpaper-smart.service`:
   - added missing values preventing automatic startup
-- UI consistency fixes:
-  - dashboard now reflects the actual applied wallpaper state
-  - improved readability of errors related to missing wallpapers
+- Dashboard now correctly reflects the applied wallpaper state
 
 ---
 
-## [1.3.0] - 2026-02-04
+## [0.3.0] - 2026-02-04
 ### Added
-- Multi-language support (fr/en/de/es/ar/ru/zh) via JSON files in `lang/`
-- Language selection in the UI (General tab) with persistence in `config.json`
-- Geolocation during installation (automatic default values) with `--no-geo` option
-- “City” geolocation mode:
-  - city input
-  - lat/lon retrieval via Nominatim (OpenStreetMap)
-- Location presets (capitals):
-  - quick selection
-  - real-time weather icon display (indicative / example)
-- Real-time weather on presets (visual indicator)
-- “About” tab:
-  - project presentation
-  - version
-  - license
-  - links (PayPal / BuyMeACoffee)
+- Multi-language support via JSON files in `lang/`
+- Language selection in the UI with persistence in `config.json`
+- “City” geolocation mode with Nominatim lookup
+- Location presets (capitals) with indicative weather icons
+- “About” tab with project information and support links
 
 ### Changed
 - New wallpaper template structure:
   - `templates/<theme>/base/` → aube.png, midi.png, coucher.png, nuit.png
   - `templates/<theme>/meteo/` → `<prefix>_<moment>.png`
-- Improved UI (geolocation ergonomics, presets, quick actions)
 - Improved installation process:
   - automatic creation and upgrade of `config.json`
   - default geolocation added during installation
-  - more robust template copy (rsync or fallback to cp)
 
 ### Fixed
-- UI / GTK fixes (general stability + refresh)
-- Fixed “hand/pointer” cursor on ComboBox without GTK crashes
-- Hover fix: cursor now applies only to the select field, not to external blocks
+- UI / GTK stability issues
+- ComboBox cursor and hover behavior
 
 ---
 
-## [1.2.0] - 2026-02-04
+## [0.2.0] - 2026-02-04
 ### Added
-- Improved geolocation presets (better selection)
-- Weather detection (Open-Meteo) to display an indicative icon in the preset list
-- UI buttons “clear” and “search lat/lon” for city input
+- Improved geolocation presets
+- Weather detection (Open-Meteo) for indicative icons
+- UI buttons for city search and clearing input
 
 ### Changed
-- More intuitive location UI (modes + better field handling)
+- More intuitive location UI
 - More stable dashboard refresh
 
 ### Fixed
-- Disable preset_combo when mode = city
-- UI focus fixes (orange / hover)
-
----
-
-## [1.1.0] - 2026-02-03
-### Added
-- “City” mode introduced in the UI
-- Clearer weather → prefix mapping
-- Image tab improvements:
-  - placeholders
-  - previews
-  - open base/ and meteo/ directories
-
-### Changed
-- Improved config logic and persistence
-
----
-
-## [1.0.0] - 2026-02-02
-### Added
-- First stable release
-- GTK3 UI (configuration)
-- Main script `wallpaper-smart.sh`
-- systemd user service + timer
-- Configuration via `~/.config/wallpaper-smart/config.json`
-- Time-based wallpaper management (dawn / noon / sunset / night)
-- Weather via Open-Meteo with configurable mapping
-- Wallpaper templates (base + meteo)
+- Preset selection disabled when city mode is active
+- UI focus and hover inconsistencies
 
 ---
 
@@ -158,3 +156,4 @@
 ### Added
 - Start of the Wallpaper Smart project
 - Core concept: dynamic wallpaper based on time of day and weather
+- Initial scripts, configuration logic, and prototype templates

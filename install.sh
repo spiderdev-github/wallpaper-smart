@@ -430,12 +430,15 @@ if [[ "$HAS_SYSTEMD" == "1" ]]; then
   cat > "$HOME/.config/systemd/user/wallpaper-smart.service.d/override.conf" <<EOF
 [Service]
 Environment=CONFIG_FILE=$CFG_FILE
+ExecStartPre=/bin/sleep 5
 EOF
 
   mkdir -p "$HOME/.config/systemd/user/wallpaper-smart.timer.d"
   cat > "$HOME/.config/systemd/user/wallpaper-smart.timer.d/override.conf" <<EOF
 [Timer]
+OnStartupSec=10s
 OnUnitActiveSec=${MINUTES}min
+Persistent=true
 EOF
 
   log "Activation timer systemd..."
