@@ -29,15 +29,16 @@ def _(s: str) -> str:
 
 APP_DIR = Path.home() / ".config" / "wallpaper-smart"
 CFG_PATH = APP_DIR / "config.json"
+CURRENT_PATH = APP_DIR / "wallpaper/current.json"
 
 SERVICE = "wallpaper-smart.service"
 TIMER = "wallpaper-smart.timer"
 
 MOMENTS: List[Tuple[str, str]] = [
-    ("aube", _("moment-aube")),
-    ("midi", _("moment-midi")),
-    ("coucher", _("moment-coucher")),
-    ("nuit", _("moment-nuit")),
+    ("aube", _("Aube")),
+    ("midi", _("Midi")),
+    ("coucher", _("Coucher")),
+    ("nuit", _("Nuit")),
 ]
 
 WEATHER_KEYS_ORDER = ["clear", "cloudy", "fog", "rain", "snow", "thunder"]
@@ -239,9 +240,6 @@ def set_hand_cursor_on_hover(widget):
 
     widget.connect("enter-notify-event", on_enter)
     widget.connect("leave-notify-event", on_leave)
-
-
-
 
 def _detect_system_lang() -> str:
     # Try LANG=fr_FR.UTF-8 -> fr_FR
@@ -727,7 +725,32 @@ def apply_css(dark: bool):
         outline: none;
         box-shadow: none;
         }
+        .ui-img-bx {
+        padding:15px
+        }
 
+        .base-row {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        }
+
+        .img-frame {
+        border-radius: 12px;
+        border: 5px solid rgba(255, 255, 255, 0.08);
+        padding: 20px
+        }
+
+        .img-frame image {
+        border-radius: 12px;
+        }
+        .img-frame {
+            box-shadow: none;
+        }
+
+        .cleanpage{
+            background:red
+        }
         """
     else:
         css = b"""
@@ -864,6 +887,21 @@ def apply_css(dark: bool):
             box-shadow: none;
         }
 
+        .base-row {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+        }
+
+        .base-row GtkLabel.muted {
+        margin-top: 6px;
+        }
+
+        .img-frame {
+        border-radius: 12px;
+        }
+
+
         """
 
 
@@ -978,6 +1016,10 @@ def prettify_meteo_log(line: str) -> str:
 
     return "  ·  ".join(parts)
 
+def clear_box(box: Gtk.Box):
+    for child in box.get_children():
+        box.remove(child)
+        
 def prettify_wallpaper_log(line: str) -> str:
     """
     Extract only the wallpaper path from a wallpaper-smart.sh log line
@@ -1053,9 +1095,17 @@ def load_cfg():
     return cfg
 
 def save_cfg(cfg):
+    # Sauvegarde de la config
     APP_DIR.mkdir(parents=True, exist_ok=True)
     with open(CFG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
+    
+    # Suppression de l'etat courant pour forcer le reload
+    if os.path.exists(CURRENT_PATH):
+        try:
+            os.remove(CURRENT_PATH)
+        except OSError:
+            pass
 
 def ensure_overrides(cfg):
     user_systemd = Path.home() / ".config" / "systemd" / "user"
@@ -1209,6 +1259,7 @@ class App(Gtk.Window):
 
         # Notebook
         self.nb = Gtk.Notebook()
+        
         root.pack_start(self.nb, True, True, 0)
 
         self.nb.append_page(self.build_tab_general(), make_tab_label(_("ui.menu-setting"), "preferences-system-symbolic"))
@@ -1220,8 +1271,7 @@ class App(Gtk.Window):
         self.nb.append_page(self.build_tab_mapping(), make_tab_label(_("ui.menu-mapping"), "view-list-symbolic"))
 
         # Images: garder une référence pour rebuild safe
-        self.images_tab = self.build_tab_images()
-        self.nb.append_page(self.images_tab, make_tab_label(_("ui.menu-images"), "image-x-generic-symbolic"))
+        self.nb.append_page(self.build_tab_images(), make_tab_label(_("ui.menu-images"), "image-x-generic-symbolic"))
 
         # btn tab About
         self.nb.append_page(self.build_tab_about(), make_tab_label(_("ui.menu-about"), "help-about-symbolic"))
@@ -1261,7 +1311,7 @@ class App(Gtk.Window):
         bar.pack_end(self.btn_toggle, False, False, 0)
 
 
-
+        self.refresh_images_preview()
         # Then every 10 minutes (avoid hammering API)
         GLib.timeout_add_seconds(600, self._timer_refresh_preset_icons)
 
@@ -1443,11 +1493,12 @@ class App(Gtk.Window):
     def _rel_path(self, kind: str, filename: str) -> str:
         theme = self._get_theme_id_from_ui_or_cfg()
         return f"templates/{theme}/{kind}/{filename}"
+        
     # ------- Tabs -------
     def build_tab_general(self):
         # Dashboard + dossier
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-
+        
         # --- Dashboard (état) ---
         self.dashboard_card = self.build_dashboard_card()
         page.pack_start(self.dashboard_card, False, False, 0)
@@ -1500,9 +1551,9 @@ class App(Gtk.Window):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
         # Label
-        lbl = Gtk.Label(label=_("tab.setting.lang-card.lbl-langue"), xalign=0)
-        lbl.get_style_context().add_class("muted")
-        content.pack_start(lbl, False, False, 0)
+        # lbl = Gtk.Label(label=_("tab.setting.lang-card.lbl-langue"), xalign=0)
+        # lbl.get_style_context().add_class("muted")
+        # content.pack_start(lbl, False, False, 0)
 
         # get current language from cfg, default to system
         ui = self.cfg.get("ui", {}) if isinstance(self.cfg.get("ui", {}), dict) else {}
@@ -1571,17 +1622,57 @@ class App(Gtk.Window):
             if l == lang:
                 self.message(msg, hint)
                 break
-
+    
+    def _build_images_wallpaper_theme_card(self) -> Gtk.Widget:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         
+        # get list of themes
+        themes = getattr(self, "wallpaper_themes", None)
+        if not themes:
+            themes = load_wallpaper_themes(self.cfg.get("wallpaper_dir", ""))
+        
+        # get current theme
+        current = (self.cfg.get("wallpaper_theme") or "default")
+        if current not in [k for k, _ in themes]:
+            current = "default"
 
-    def build_wallpaper_theme_card(self) -> Gtk.Widget:
+        self.img_wall_theme_combo = Gtk.ComboBoxText()
+        for key, label in themes:
+            self.img_wall_theme_combo.append(key, label)
+
+        self.img_wall_theme_combo.set_active_id(current)
+        self.img_wall_theme_combo.connect("changed", lambda _b: self.refresh_images_preview())
+        
+        box.pack_start(self.img_wall_theme_combo, False, False, 0)
+        disable_scroll_change(self.img_wall_theme_combo)
+
+        self.style_list = Gtk.ComboBoxText()
+        self.style_list.append("dark",  "☾ " + _("tab.images.style-list.dark"))
+        self.style_list.append("light", "☀  " + _("tab.images.style-list.light"))
+        
+        # la valeur par défault ets "desktop_style" dans le config, sinon dark
+        current_style = self.cfg.get("desktop_style", "dark")
+        if current_style == "light":
+            self.style_list.set_active(1)
+        else:   
+            self.style_list.set_active(0)  # Default to dark mode
+
+        self.style_list.connect("changed", lambda _b: self.refresh_images_preview())
+        
+        box.pack_start(self.style_list, False, False, 0)
+        disable_scroll_change(self.style_list)
+
+
+        return make_card(_("tab.setting.theme-card.title"), box)
+    
+    def build_wallpaper_theme_card(self, no_label=False) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
         row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
-        lab = Gtk.Label(label=_("tab.setting.theme-card.lbl-theme"), xalign=0)
-        lab.get_style_context().add_class("muted")
-        row.pack_start(lab, False, False, 0)
+        # lab = Gtk.Label(label=_("tab.setting.theme-card.lbl-theme"), xalign=0)
+        # lab.get_style_context().add_class("muted")
+        # row.pack_start(lab, False, False, 0)
 
         self.wall_theme_combo = Gtk.ComboBoxText()
         themes = getattr(self, "wallpaper_themes", None)
@@ -1606,22 +1697,60 @@ class App(Gtk.Window):
 
         row.pack_start(eb, True, True, 0)
         box.pack_start(row, False, False, 0)
-
-        help_lbl = Gtk.Label(
-            label=_("tab.setting.theme-card.legend"),
-            xalign=0
-        )
-        help_lbl.set_line_wrap(True)
-        help_lbl.get_style_context().add_class("muted")
-        box.pack_start(help_lbl, False, False, 0)
+        
+        if no_label :
+            help_lbl = Gtk.Label(label=_("tab.setting.theme-card.legend"), xalign=0)
+            help_lbl.set_line_wrap(True)
+            help_lbl.get_style_context().add_class("muted")
+            box.pack_start(help_lbl, False, False, 0)
 
         return make_card(_("tab.setting.theme-card.title"), box)
     
+    def build_style_theme_card(self) -> Gtk.Widget:
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        # lab = Gtk.Label(label=_("[add-tradd]"), xalign=0)
+        # lab.get_style_context().add_class("muted")
+        # row.pack_start(lab, False, False, 0)
+
+        
+        # # add top to main card
+        self.style_list = Gtk.ComboBoxText()
+        self.style_list.append("dark",  "☾ " + _("tab.images.style-list.dark"))
+        self.style_list.append("light", "☀  " + _("tab.images.style-list.light"))
+        
+        # la valeur par défault ets "desktop_style" dans le config, sinon dark
+        current_style = self.cfg.get("desktop_style", "dark")
+        if current_style == "light":
+            self.style_list.set_active(1)
+        else:   
+            self.style_list.set_active(0)  # Default to dark mode
+
+        self.style_list.connect("changed", self.on_style_changed)
+        disable_scroll_change(self.style_list)
+        #set_hand_cursor_on_hover(self.style_list)
+
+        eb = Gtk.EventBox()
+        eb.add(self.style_list)
+        set_hand_cursor_on_hover(eb)
+
+        row.pack_start(eb, True, True, 0)
+        box.pack_start(row, False, False, 0)
+
+        # help_lbl = Gtk.Label(label=_("tab.setting.theme-card.legend"), xalign=0)
+        # help_lbl.set_line_wrap(True)
+        # help_lbl.get_style_context().add_class("muted")
+        # box.pack_start(help_lbl, False, False, 0)
+
+        return make_card(_("tab.images.card-action.style"), box)
+    
     def on_wall_theme_changed(self, _combo):
         theme_id = self.wall_theme_combo.get_active_id() or "default"
         self.cfg["wallpaper_theme"] = theme_id
-        self.rebuild_images_tab(focus=False)
+        self.img_wall_theme_combo.set_active_id(theme_id)
+        # self.rebuild_images_tab(focus=False)
         self.refresh_images_preview()
         
     def build_dashboard_card(self) -> Gtk.Widget:
@@ -2073,34 +2202,80 @@ class App(Gtk.Window):
 
         return make_page(make_card(_("tab.mapping.card-mapping.title"), content))
 
-
+    def on_style_changed(self, combo):
+        style = self.style_list.get_active_id() or "dark"
+        print(f"style changed : {style}")
+        # self._build_base_panel(style)
+        
     def build_tab_images(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
 
         top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
+        # Actions : refresh preview, open base folder, open meteo folder, create placeholders
         btn_refresh = Gtk.Button(label=_("tab.images.card-action.btn-refresh"))
         btn_refresh.connect("clicked", lambda _b: self.refresh_images_preview())
-        set_hand_cursor_on_hover(btn_refresh)
-
-        top.pack_start(btn_refresh, False, False, 0)
-
+        
+        # Placeholders : create empty files for all moments+meteo conditions, to help users add their own wallpapers
         btn_placeholders = Gtk.Button(label=_("tab.images.card-action.btn-create-placeholder"))
         btn_placeholders.connect("clicked", self.on_create_placeholders)
-        set_hand_cursor_on_hover(btn_placeholders)
-        top.pack_start(btn_placeholders, False, False, 0)
 
+        # Open base folder in file manager
         btn_open_base = Gtk.Button(label=_("tab.images.card-action.btn-open-base"))
-        btn_open_base.connect("clicked", lambda _b: self._open_subdir("base", themed=True))
-        set_hand_cursor_on_hover(btn_open_base)
-        top.pack_start(btn_open_base, False, False, 0)
-
+        btn_open_base.connect("clicked", lambda _b: self._open_subdir(f"{self.style_list.get_active_id()}/base", themed=True))
+        # Open meteo folder in file manager
         btn_open_meteo = Gtk.Button(label=_("tab.images.card-action.btn-open-weather"))
-        btn_open_meteo.connect("clicked", lambda _b: self._open_subdir("meteo", themed=True))
+        btn_open_meteo.connect("clicked", lambda _b: self._open_subdir(f"{self.style_list.get_active_id()}/meteo", themed=True))
+        
+        # # Cursors
+        set_hand_cursor_on_hover(btn_refresh)
+        # set_hand_cursor_on_hover(btn_placeholders)
+        set_hand_cursor_on_hover(btn_open_base)
+        set_hand_cursor_on_hover(btn_open_base)
         set_hand_cursor_on_hover(btn_open_meteo)
+
+        # # Layout
+        top.pack_start(btn_refresh, False, False, 0)
+        # top.pack_start(btn_placeholders, False, False, 0)
+        top.pack_start(btn_open_base, False, False, 0)
         top.pack_start(btn_open_meteo, False, False, 0)
 
+        # # add top to main card
         page.pack_start(make_card(_("tab.images.card-action.title"), top), False, False, 0)
+
+        
+        # --- Wallpaper theme ---
+        self.wall_theme_card = self._build_images_wallpaper_theme_card()
+        page.pack_start(self.wall_theme_card, False, False, 0)
+
+        # # --- Styles theme ---
+        # self.style_theme_card = self.build_style_theme_card()
+        # page.pack_start(self.style_theme_card, False, False, 0)
+
+
+
+
+        # header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        # header.set_hexpand(True)
+
+        # # add ComboBoxText width 100% width dark ou light
+        # self.style_list = Gtk.ComboBoxText()
+        # self.style_list.append("dark",  "☾ " + _("tab.images.style-list.dark"))
+        # self.style_list.append("light", "☀  " + _("tab.images.style-list.light"))
+        # self.style_list.connect("changed", self.on_style_changed)
+        
+        # # la valeur par défault ets "desktop_style" dans le config, sinon dark
+        # current_style = self.cfg.get("desktop_style", "dark")
+        # if current_style == "light":
+        #     self.style_list.set_active(1)
+        # else:   
+        #     self.style_list.set_active(0)  # Default to dark mode
+        # header.pack_start(self.style_list, False, False, 0)
+        
+        # # add top to main card
+        # page.pack_start(make_card(_("tab.images.card-action.style"), header), False, False, 0)
+
+        
 
         # Split view 50/50 (modifiable ensuite en glissant)
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -2128,18 +2303,112 @@ class App(Gtk.Window):
         meteo_items = self._build_meteo_items_from_mapping()
         meteo_panel = self._build_meteo_panel(meteo_items)
 
+        # Assemble
         paned.pack1(base_panel, resize=True, shrink=False)
         paned.pack2(meteo_panel, resize=True, shrink=False)
 
         # Refresh previews + default selection = moment courant
-        self.refresh_images_preview()
         try:
             moment_now = self._compute_current_moment_key()
             self._select_base_moment(moment_now)
         except Exception:
             pass
-
+        self.refresh_images_preview()
         return make_page(page)
+
+    # def build_tab_images(self):
+    #     page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+    #     top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    #     top.set_hexpand(True)
+
+    #     # add ComboBoxText width 100% width dark ou light
+    #     style_list = Gtk.ComboBoxText()
+    #     style_list.append_text(_("tab.images.style-list.dark"))
+    #     style_list.append_text(_("tab.images.style-list.light"))
+
+    #     # la valeur par défault ets "desktop_style" dans le config, sinon dark
+    #     current_style = self.cfg.get("desktop_style", "dark")
+    #     if current_style == "light":
+    #         style_list.set_active(1)
+    #     else:   
+    #         style_list.set_active(0)  # Default to dark mode
+    #     top.pack_start(style_list, False, False, 0)
+        
+    #     # add top to main card
+    #     page.pack_start(make_card(_("Style de theme"), top), False, False, 0)
+
+    #     # action panel
+    #     action = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    #     action.set_hexpand(True)
+    
+    #     open_base_btn = Gtk.Button(label="Open base")
+    #     open_base_btn.connect("clicked", lambda _b: self._open_subdir("base", themed=True))
+
+
+    #     action.pack_start(open_base_btn, False, False, 0)
+
+    #     # add action to main card
+    #     page.pack_start(make_card(_("Action"), action), False, False, 0)
+
+    #     body = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        
+    #     # # split view 50/50 empty
+    #     # paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+    #     # body.pack_start(paned, True, True, 0)
+    #     #     # State
+    #     # self.images_selected_moment = getattr(self, "images_selected_moment", None) or None
+    #     # # Panels
+    #     # base_panel = self._build_base_panel()
+    #     # meteo_items = self._build_meteo_items_from_mapping()
+    #     # meteo_panel = self._build_meteo_panel(meteo_items)
+    #     # # Assemble
+    #     # paned.pack1(base_panel, resize=True, shrink=False)  
+    #     # paned.pack2(meteo_panel, resize=True, shrink=False) 
+
+    #     # page.pack_start(make_card(_("Preview"), body), False, False, 0)
+
+
+    #     # Split view 50/50 (modifiable ensuite en glissant)
+    #     paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+    #     page.pack_start(paned, True, True, 0)
+
+    #     # Positionner 50% une seule fois (sinon l'utilisateur ne peut jamais ajuster)
+    #     self._paned_inited = False
+
+    #     def _paned_50(_w, alloc):
+    #         if self._paned_inited:
+    #             return
+    #         try:
+    #             paned.set_position(int(alloc.width * 0.5))
+    #             self._paned_inited = True
+    #         except Exception:
+    #             pass
+
+    #     paned.connect("size-allocate", _paned_50)
+
+    #     # State
+    #     self.images_selected_moment = getattr(self, "images_selected_moment", None) or None
+
+    #     # Panels
+    #     base_panel = self._build_base_panel_v2()
+    #     meteo_items = self._build_meteo_items_from_mapping()
+    #     meteo_panel = self._build_meteo_panel(meteo_items)
+
+    #     # Assemble
+    #     paned.pack1(base_panel, resize=True, shrink=False)
+    #     paned.pack2(meteo_panel, resize=True, shrink=False)
+
+       
+
+    #     try:
+    #         moment_now = self._compute_current_moment_key()
+    #         self._select_base_moment(moment_now)
+    #     except Exception:
+    #         pass
+
+    #     return make_page(page)
+
 
     def build_tab_about(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -2304,32 +2573,53 @@ class App(Gtk.Window):
             self.base_list.select_row(row)
         self.images_selected_moment = moment_key
         self.apply_meteo_filter(moment_key)
+    
+    
+            
+    def clear_box(box: Gtk.Box):
+        for child in box.get_children():
+            box.remove(child)
 
-    def _build_base_panel(self) -> Gtk.Widget:
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    def _build_base_panel(self, style: str | None = None) -> Gtk.Widget:
+        if not style:
+            style = self.style_list.get_active_id() or "dark"
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         outer.get_style_context().add_class("card")
 
-        t = Gtk.Label(label=_("Base"), xalign=0)
-        t.get_style_context().add_class("card-title")
-        outer.pack_start(t, False, False, 0)
-
-        self.base_list = Gtk.ListBox()
-        self.base_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
-        self.base_list.set_activate_on_single_click(True)
-        self.base_list.connect("row-selected", self.on_base_selected)
-        outer.pack_start(self.base_list, True, True, 0)
+        title = Gtk.Label(label=_("Fond d'ecran de base"), xalign=0)
+        title.get_style_context().add_class("card-title")
+        outer.pack_start(title, False, False, 0)
 
         # moment_key -> (row, img, path_lbl, chip_lbl, current_chip)
         self.base_rows = {}
 
         for moment_key, moment_label in MOMENTS:
-            row = Gtk.ListBoxRow()
-            row.moment_key = moment_key  # attach
-            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            # Use a normal container instead of Gtk.ListBoxRow
+            row = Gtk.EventBox()
+            row.moment_key = moment_key
+            row.set_margin_top(10)
+            row.set_margin_bottom(10)
+            row.set_margin_start(10)
+            row.set_margin_end(10)
+            row.get_style_context().add_class("base-row")
+
+            # Click on the whole card
+            row.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+            row.connect("button-press-event", self._on_base_card_clicked, moment_key)
+
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            box.set_margin_top(12)
+            box.set_margin_bottom(12)
+            box.set_margin_start(14)
+            box.set_margin_end(14)
             row.add(box)
 
-            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            header.set_margin_bottom(6)
+
             name = Gtk.Label(label=moment_label, xalign=0)
+            name.get_style_context().add_class("mylabel")
             header.pack_start(name, True, True, 0)
 
             chip = Gtk.Label(label="…")
@@ -2345,29 +2635,54 @@ class App(Gtk.Window):
             header.pack_start(current_chip, False, False, 0)
 
             btn_pick = Gtk.Button(label=_("tab.images.card-base.btn-choose"))
-            btn_pick.connect("clicked", self.on_pick_image, self._rel_path("base", f"{moment_key}.png"))
+            btn_pick.connect(
+                "clicked",
+                self.on_pick_image,
+                self._rel_path("base", f"{moment_key}.png")
+            )
             set_hand_cursor_on_hover(btn_pick)
             header.pack_end(btn_pick, False, False, 0)
 
+            box.pack_start(header, False, False, 0)
+
             img = Gtk.Image()
             img.set_size_request(420, 240)
+            
+
+            img_frame = Gtk.Frame()
+            img_frame.set_shadow_type(Gtk.ShadowType.NONE)
+            img_frame.get_style_context().add_class("img-frame")
+            img_frame.add(img)
+
+            
+            # Click specifically on image area too (optional)
+            img_frame.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+            img_frame.connect("button-press-event", self._on_base_card_clicked, moment_key)
+            
+            box.pack_start(img_frame, False, False, 0)
 
             path_lbl = Gtk.Label(label="", xalign=0)
             path_lbl.set_line_wrap(True)
             path_lbl.get_style_context().add_class("muted")
-
-            box.pack_start(header, False, False, 0)
-            box.pack_start(img, False, False, 0)
+            path_lbl.set_margin_top(6)
             box.pack_start(path_lbl, False, False, 0)
 
-            self.base_list.add(row)
+            outer.pack_start(row, False, False, 0)
             self.base_rows[moment_key] = (row, img, path_lbl, chip, current_chip)
 
-        self.base_list.show_all()
         return outer
 
+
+    def _on_base_card_clicked(self, widget, event, moment_key: str):
+        # Reuse your previous selection handler
+        # If your on_base_selected expects (listbox, row), adapt here
+        self.on_base_selected(None, self.base_rows[moment_key][0])
+        return True
+
+
+
     def _build_meteo_panel(self, items: List[Tuple[str, str]]) -> Gtk.Widget:
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         outer.get_style_context().add_class("card")
 
         self.meteo_title_label = Gtk.Label(label=_("Météo"), xalign=0)
@@ -2379,7 +2694,10 @@ class App(Gtk.Window):
         outer.pack_start(sc, True, True, 0)
 
         v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        v.set_border_width(6)
+        v.set_margin_top(8)
+        v.set_margin_bottom(8)
+        v.set_margin_start(8)
+        v.set_margin_end(8)
         sc.add(v)
 
         # rel_path -> (img, path_lbl, chip_lbl, switch)
@@ -2388,10 +2706,28 @@ class App(Gtk.Window):
         self.meteo_row_moment = {}
 
         for label, rel in items:
-            row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            # --- Card container (same as Base) ---
+            row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            row.set_margin_top(10)
+            row.set_margin_bottom(10)
+            row.set_margin_start(10)
+            row.set_margin_end(10)
+            row.get_style_context().add_class("base-row")  # reuse same CSS
 
-            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            # Internal padding
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            box.set_margin_top(12)
+            box.set_margin_bottom(12)
+            box.set_margin_start(14)
+            box.set_margin_end(14)
+            row.pack_start(box, True, True, 0)
+
+            # --- Header ---
+            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            header.set_margin_bottom(6)
+
             name = Gtk.Label(label=label, xalign=0)
+            name.get_style_context().add_class("mylabel")
             header.pack_start(name, True, True, 0)
 
             chip = Gtk.Label(label="…")
@@ -2399,8 +2735,9 @@ class App(Gtk.Window):
             chip.get_style_context().add_class("chip-miss")
             header.pack_start(chip, False, False, 0)
 
-            active_lbl = Gtk.Label(label=_("tab.setting.dashboard-card.state-on"), xalign=0)
+            active_lbl = Gtk.Label(label=_("tab.setting.dashboard-card.state-on"))
             active_lbl.get_style_context().add_class("muted")
+            header.pack_start(active_lbl, False, False, 0)
 
             active_sw = Gtk.Switch()
             active_sw.set_active(True)
@@ -2408,8 +2745,6 @@ class App(Gtk.Window):
             set_hand_cursor_on_hover(active_sw)
             hid = active_sw.connect("notify::active", self.on_toggle_image_enabled, rel)
             active_sw._hid_active = hid
-
-            header.pack_start(active_lbl, False, False, 0)
             header.pack_start(active_sw, False, False, 0)
 
             btn_pick = Gtk.Button(label=_("tab.images.card-meteo.btn-choose"))
@@ -2417,19 +2752,29 @@ class App(Gtk.Window):
             set_hand_cursor_on_hover(btn_pick)
             header.pack_end(btn_pick, False, False, 0)
 
+            box.pack_start(header, False, False, 0)
+
+            # --- Image (same frame as Base) ---
             img = Gtk.Image()
             img.set_size_request(420, 240)
 
+            img_frame = Gtk.Frame()
+            img_frame.set_shadow_type(Gtk.ShadowType.NONE)
+            img_frame.get_style_context().add_class("img-frame")
+            img_frame.add(img)
+
+            box.pack_start(img_frame, False, False, 0)
+
+            # --- Path ---
             path_lbl = Gtk.Label(label="", xalign=0)
             path_lbl.set_line_wrap(True)
             path_lbl.get_style_context().add_class("muted")
-
-            row.pack_start(header, False, False, 0)
-            row.pack_start(img, False, False, 0)
-            row.pack_start(path_lbl, False, False, 0)
+            path_lbl.set_margin_top(6)
+            box.pack_start(path_lbl, False, False, 0)
 
             v.pack_start(row, False, False, 0)
 
+            # --- Registries ---
             self.image_widgets[rel] = (img, path_lbl, chip, active_sw)
             self.meteo_rows[rel] = row
 
@@ -2442,7 +2787,7 @@ class App(Gtk.Window):
 
         v.show_all()
 
-        # Title defaults to moment courant
+        # Title defaults to current moment
         try:
             self._set_meteo_title(self._compute_current_moment_key())
         except Exception:
@@ -2460,13 +2805,25 @@ class App(Gtk.Window):
         self.apply_meteo_filter(moment)
 
     def apply_meteo_filter(self, moment_key: str):
-        """Show only meteo rows matching the selected moment."""
         self._set_meteo_title(moment_key)
+
         if not getattr(self, "meteo_rows", None):
             return
+
+        any_visible = False
+
         for rel, row in self.meteo_rows.items():
             mk = self.meteo_row_moment.get(rel)
-            row.set_visible(bool(mk == moment_key))
+            visible = (mk == moment_key)
+            row.set_visible(visible)
+            if visible:
+                any_visible = True
+
+        if not any_visible:
+            self.meteo_title_label.set_text(
+                _("Météo — aucun fond disponible pour ce moment")
+            )
+
 
 
     def _build_meteo_items_from_mapping(self) -> List[Tuple[str, str]]:
@@ -2484,7 +2841,7 @@ class App(Gtk.Window):
                 continue
             for moment_key, _moment_label in MOMENTS:
                 label = f"{prefix}_{moment_key}"
-                rel = self._rel_path("meteo", f"{prefix}_{moment_key}.png")
+                rel = self._rel_path(f"{self.style_list.get_active_id()}/meteo", f"{prefix}_{moment_key}.png")
                 items.append((label, rel))
         return items
 
@@ -2898,10 +3255,36 @@ class App(Gtk.Window):
         dst.write_bytes(src.read_bytes())
         self.refresh_images_preview()
 
+    def _rel_swap_style(self, rel: str, style: str) -> str:
+        parts = list(Path(rel).parts)
+
+        # Replace first occurrence of dark/light anywhere in the path
+        for i, part in enumerate(parts):
+            if part in ("dark", "light"):
+                parts[i] = style
+                return str(Path(*parts))
+
+        return rel
+
+    def _rel_swap_theme(self, rel: str, theme: str) -> str:
+        parts = list(Path(rel).parts)
+
+        # Look for ".../templates/<theme>/..."
+        for i in range(len(parts) - 1):
+            if parts[i] == "templates":
+                parts[i + 1] = theme
+                return str(Path(*parts))
+
+        return rel
+
+
 
     def refresh_images_preview(self):
         root = Path(self.folder_entry.get_text().strip())
         enabled_map = self.cfg.get("enabled_images", {})
+
+        cur_style = self.style_list.get_active_id() or "dark"
+        cur_theme = self.img_wall_theme_combo.get_active_id() or "default"
 
         # --- Base previews (left) ---
         moment_now = None
@@ -2912,8 +3295,9 @@ class App(Gtk.Window):
 
         if getattr(self, "base_rows", None):
             for moment_key, (_row, img_widget, path_lbl, chip_lbl, current_chip) in self.base_rows.items():
-                rel = self._rel_path("base", f"{moment_key}.png")
-                p = root / rel 
+                rel = self._rel_path(f"{cur_style}/base", f"{moment_key}.png")
+                rel = self._rel_swap_theme(rel, cur_theme)
+                p = root / rel
                 exists = p.exists()
 
                 path_lbl.set_text(str(p))
@@ -2941,10 +3325,13 @@ class App(Gtk.Window):
 
         # --- Meteo previews (right) ---
         for rel, (img_widget, path_lbl, chip_lbl, active_sw) in getattr(self, "image_widgets", {}).items():
-            p = root / rel
+            rel2 = self._rel_swap_theme(rel, cur_theme)
+            rel2 = self._rel_swap_style(rel2, cur_style)
+
+            p = root / rel2
             exists = p.exists()
 
-            enabled = bool(enabled_map.get(rel, True))
+            enabled = bool(enabled_map.get(rel2, enabled_map.get(rel, True)))
             hid = getattr(active_sw, "_hid_active", None)
             if hid is not None:
                 active_sw.handler_block(hid)
@@ -2978,6 +3365,8 @@ class App(Gtk.Window):
             self.apply_meteo_filter(moment)
 
 
+
+
     def on_save(self, _btn):
         # self.on_test(_btn)  # test first to validate inputs
         current_page = self.nb.get_current_page()
@@ -2997,6 +3386,7 @@ class App(Gtk.Window):
             if theme_id not in valid_ids:
                 theme_id = valid_ids[0]
             cfg["wallpaper_theme"] = theme_id
+            # self.img_wall_theme_combo.set_active_id(theme_id)
 
             cfg["timer_minutes"] = int(self.spin_minutes.get_value())
 
@@ -3069,11 +3459,14 @@ class App(Gtk.Window):
 
             root = Path(cfg["wallpaper_dir"])
             theme = (cfg.get("wallpaper_theme") or "default").strip() or "default"
-            (root / "templates" / theme / "base").mkdir(parents=True, exist_ok=True)
-            (root / "templates" / theme / "meteo").mkdir(parents=True, exist_ok=True)
+            (root / "templates" / theme / "dark/base").mkdir(parents=True, exist_ok=True)
+            (root / "templates" / theme / "dark/meteo").mkdir(parents=True, exist_ok=True)
+            (root / "templates" / theme / "light/base").mkdir(parents=True, exist_ok=True)
+            (root / "templates" / theme / "light/meteo").mkdir(parents=True, exist_ok=True)
 
             # rebuild Images tab (mapping dynamic)
-            self.rebuild_images_tab(focus=False)
+            self.img_wall_theme_combo.set_active_id(theme_id)
+
             idx_back = self.nb.page_num(current_widget)
             if idx_back != -1:
                 self.nb.set_current_page(idx_back)
@@ -3081,6 +3474,7 @@ class App(Gtk.Window):
             self.message("OK", _("ui.saved-successfully"))
             self.refresh_toggle_label()
             self.refresh_dashboard()
+            self.refresh_images_preview()
         except Exception as e:
             self.message("Erreur", str(e))
 

@@ -362,7 +362,7 @@ Useful commands:
 ```bash
 systemctl --user status wallpaper-smart.timer
 systemctl --user start wallpaper-smart.service
-systemctl --user wallpaper-smart-style-hook.path
+systemctl --user start wallpaper-smart-style-hook.path
 journalctl --user -u wallpaper-smart.service -n 50 --no-pager
 journalctl --user -u wallpaper-smart-style-hook.service -n 50 --no-pager
 ```

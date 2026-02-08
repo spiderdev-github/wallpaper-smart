@@ -93,5 +93,10 @@
   "tab.about.card-about.label-info": "Wallpaper Smart change automatiquement votre fond d'ecran selon l'heure et la meteo locale. Vous pouvez aussi definir des images meteo par theme.",
   "tab.about.card-donate.title": "Dons",
   "tab.about.card-donate.label-title": "Soutenir le projet",
-  "tab.about.card-donate.label-title-desc" : "Si l'app vous aide, un petit don permet de financer le temps de dev et les evolutions."
+  "tab.about.card-donate.label-title-desc" : "Si l'app vous aide, un petit don permet de financer le temps de dev et les evolutions.",
+  "tab.images.card-style.title": "Style",
+  "tab.images.style-list.dark": "Sombre",
+  "tab.images.style-list.light": "Clair",
+  "tab.images.card-action.style": "Style de theme",
+  "tab.images.pannel-base.title": "Images de base"
 }
