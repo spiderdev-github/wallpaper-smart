@@ -738,7 +738,7 @@ def apply_css(dark: bool):
         .img-frame {
         border-radius: 12px;
         border: 5px solid rgba(255, 255, 255, 0.08);
-        padding: 20px
+        padding: 20px 0 
         }
 
         .img-frame image {
@@ -1493,7 +1493,10 @@ class App(Gtk.Window):
     def _rel_path(self, kind: str, filename: str) -> str:
         theme = self._get_theme_id_from_ui_or_cfg()
         return f"templates/{theme}/{kind}/{filename}"
-        
+    
+    def _rel_image_path(self, kind: str, filename: str) -> str:
+        return f"{kind}/{filename}"
+    
     # ------- Tabs -------
     def build_tab_general(self):
         # Dashboard + dossier
@@ -2638,7 +2641,7 @@ class App(Gtk.Window):
             btn_pick.connect(
                 "clicked",
                 self.on_pick_image,
-                self._rel_path("base", f"{moment_key}.png")
+                self._rel_image_path(f"base", f"{moment_key}.png")
             )
             set_hand_cursor_on_hover(btn_pick)
             header.pack_end(btn_pick, False, False, 0)
@@ -2747,8 +2750,13 @@ class App(Gtk.Window):
             active_sw._hid_active = hid
             header.pack_start(active_sw, False, False, 0)
 
-            btn_pick = Gtk.Button(label=_("tab.images.card-meteo.btn-choose"))
-            btn_pick.connect("clicked", self.on_pick_image, rel)
+            btn_pick = Gtk.Button(label=_("tab.images.card-meteo.btn-choose"))            
+            btn_pick.connect(
+                "clicked",
+                self.on_pick_image,
+                self._rel_image_path(f"meteo", f"{label}.png")
+            )
+
             set_hand_cursor_on_hover(btn_pick)
             header.pack_end(btn_pick, False, False, 0)
 
@@ -2844,63 +2852,6 @@ class App(Gtk.Window):
                 rel = self._rel_path(f"{self.style_list.get_active_id()}/meteo", f"{prefix}_{moment_key}.png")
                 items.append((label, rel))
         return items
-
-    def _images_group(self, title: str, items: List[Tuple[str, str]], allow_toggle: bool):
-        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        outer.get_style_context().add_class("card")
-
-        t = Gtk.Label(label=title, xalign=0)
-        t.get_style_context().add_class("card-title")
-        outer.pack_start(t, False, False, 0)
-
-        sc = Gtk.ScrolledWindow()
-        sc.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        outer.pack_start(sc, True, True, 0)
-
-        v = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        v.set_border_width(6)
-        sc.add(v)
-
-        for label, rel in items:
-            row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-
-            header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-            name = Gtk.Label(label=label, xalign=0)
-            header.pack_start(name, True, True, 0)
-
-            chip = Gtk.Label(label="…")
-            chip.get_style_context().add_class("chip")
-            chip.get_style_context().add_class("chip-miss")
-            header.pack_start(chip, False, False, 0)
-
-            active_cb = Gtk.CheckButton(label=_("Actif"))
-            active_cb.set_active(True)
-            if allow_toggle:
-                hid = active_cb.connect("toggled", self.on_toggle_image_enabled, rel)
-                active_cb._hid_toggled = hid
-            else:
-                active_cb.set_sensitive(False)
-            header.pack_start(active_cb, False, False, 0)
-
-            btn_pick = Gtk.Button(label=_("tab.images.card-base.btn-choose"))
-            btn_pick.connect("clicked", self.on_pick_image, rel)
-            header.pack_end(btn_pick, False, False, 0)
-
-            img = Gtk.Image()
-            img.set_size_request(420, 240)
-
-            path_lbl = Gtk.Label(label="", xalign=0)
-            path_lbl.set_line_wrap(True)
-            path_lbl.get_style_context().add_class("muted")
-
-            row.pack_start(header, False, False, 0)
-            row.pack_start(img, False, False, 0)
-            row.pack_start(path_lbl, False, False, 0)
-
-            v.pack_start(row, False, False, 0)
-            self.image_widgets[rel] = (img, path_lbl, chip, active_cb)
-
-        return outer
 
     # ------- Actions -------
 
@@ -3247,10 +3198,16 @@ class App(Gtk.Window):
     def on_pick_image(self, _btn, rel_path):
         root = Path(self.folder_entry.get_text().strip())
         chosen = pick_file(self, f"Choisir {rel_path}", root)
+
+        theme = self.img_wall_theme_combo.get_active_id()
+        css = self.style_list.get_active_id()
+
         if not chosen:
             return
         src = Path(chosen)
-        dst = root / rel_path
+        dst = root / "templates" / theme / css / rel_path
+
+        #print(f"dest: {dst}")
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(src.read_bytes())
         self.refresh_images_preview()
