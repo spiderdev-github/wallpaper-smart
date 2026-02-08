@@ -748,9 +748,17 @@ def apply_css(dark: bool):
             box-shadow: none;
         }
 
-        .cleanpage{
-            background:red
+        .base-current {
+        border: 2px solid rgba(255, 160, 60, 0.9);
+        background: rgba(255, 160, 60, 0.10);
         }
+
+        .meteo-current {
+        border-left: 4px solid #ff9f3a;
+        background: rgba(255, 159, 58, 0.08);
+        }
+
+
         """
     else:
         css = b"""
@@ -901,6 +909,15 @@ def apply_css(dark: bool):
         border-radius: 12px;
         }
 
+        .base-current {
+        border: 2px solid rgba(255, 160, 60, 0.9);
+        background: rgba(255, 160, 60, 0.10);
+        }
+
+        .meteo-current {
+        border-left: 4px solid #ff9f3a;
+        background: rgba(255, 159, 58, 0.08);
+        }
 
         """
 
@@ -971,6 +988,32 @@ MOMENT_LABELS = {
     "nuit": _("Nuit"),
 }
 
+def prettify_meteo_value_log(line: str) -> str:
+    """
+    Convert a raw wallpaper-smart.sh journal line into a user-friendly text.
+    Expected pattern inside line:
+      moment=... | bucket=... | prefix=... | candidate=... | code=... | LAT=... LON=...
+    """
+    import re
+
+    m = re.search(
+        r"moment=(\w+)\s*\|\s*bucket=(\w+)\s*\|\s*prefix=([^\s|]+)\s*\|\s*candidate=(\w+)\s*\|\s*code=(\d+)\s*\|\s*LAT=([-\d.]+)\s*LON=([-\d.]+)",
+        line,
+    )
+
+    # If no match, keep it short but still readable
+    if not m:
+        s = (line or "").strip()
+        if len(s) > 250:
+            s = s[:250] + "…"
+        return s or "—"
+
+    moment, bucket, _prefix, candidate, code, lat, lon = m.groups()
+
+    print(f"meteo: {_prefix}")
+    return _prefix
+
+
 def prettify_meteo_log(line: str) -> str:
     """
     Convert a raw wallpaper-smart.sh journal line into a user-friendly text.
@@ -1005,14 +1048,6 @@ def prettify_meteo_log(line: str) -> str:
 
     # Keep details but in a friendly compact way
     parts.append(f"Code {code}")
-
-    #try:
-    #    parts.append(f"{float(lat):.2f}, {float(lon):.2f}")
-    #except Exception:
-    #    pass
-
-    #if t:
-    #    parts.append(f"{t}")
 
     return "  ·  ".join(parts)
 
@@ -1561,7 +1596,6 @@ class App(Gtk.Window):
         # get current language from cfg, default to system
         ui = self.cfg.get("ui", {}) if isinstance(self.cfg.get("ui", {}), dict) else {}
         cur_lang = ui.get("language", "system")
-        print('Current language:', cur_lang)
 
         # Combo
         lang = _detect_system_lang()
@@ -1842,6 +1876,7 @@ class App(Gtk.Window):
                     moment = "coucher" if coucher <= hour < nuit else "nuit"
                 else:
                     moment = "coucher" if (hour >= coucher or hour < nuit) else "nuit"
+            
 
             moment_txt = MOMENT_LABELS.get(moment, moment)
             self.dash_moment.set_text(f"{moment_txt} - {now.strftime('%Hh%M')}")
@@ -1968,6 +2003,7 @@ class App(Gtk.Window):
 
             if meta_line:
                 self.dash_meteo.set_text(prettify_meteo_log(meta_line))
+                self.weather_value = prettify_meteo_value_log(meta_line)
             else:
                 self.dash_meteo.set_text("—")
             print("Meta line: %s" % meta_line)
@@ -2208,7 +2244,6 @@ class App(Gtk.Window):
     def on_style_changed(self, combo):
         style = self.style_list.get_active_id() or "dark"
         print(f"style changed : {style}")
-        # self._build_base_panel(style)
         
     def build_tab_images(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -2795,11 +2830,19 @@ class App(Gtk.Window):
 
         v.show_all()
 
-        # Title defaults to current moment
         try:
-            self._set_meteo_title(self._compute_current_moment_key())
+            moment_now = self._compute_current_moment_key()
         except Exception:
-            pass
+            moment_now = None
+
+        if moment_now:
+            self.images_selected_moment = moment_now
+
+            def _apply_filter_late():
+                self.apply_meteo_filter(moment_now)
+                return False  # run once
+
+            GLib.idle_add(_apply_filter_late)
 
         return outer
 
@@ -2822,7 +2865,14 @@ class App(Gtk.Window):
 
         for rel, row in self.meteo_rows.items():
             mk = self.meteo_row_moment.get(rel)
+
+            # Fallback: try to detect moment directly from rel
+            if mk is None:
+                if f"_{moment_key}.png" in rel:
+                    mk = moment_key
+
             visible = (mk == moment_key)
+
             row.set_visible(visible)
             if visible:
                 any_visible = True
@@ -2831,6 +2881,7 @@ class App(Gtk.Window):
             self.meteo_title_label.set_text(
                 _("Météo — aucun fond disponible pour ce moment")
             )
+
 
 
 
@@ -3280,6 +3331,14 @@ class App(Gtk.Window):
                     else:
                         current_chip.hide()
 
+                # --- Highlight current moment ---
+                row_ctx = _row.get_style_context()
+                row_ctx.remove_class("base-current")
+                if moment_now and moment_key == moment_now:
+                    row_ctx.add_class("base-current")
+
+
+        
         # --- Meteo previews (right) ---
         for rel, (img_widget, path_lbl, chip_lbl, active_sw) in getattr(self, "image_widgets", {}).items():
             rel2 = self._rel_swap_theme(rel, cur_theme)
@@ -3312,6 +3371,16 @@ class App(Gtk.Window):
             else:
                 chip_lbl.set_text(_("tab.images.card-meteo.state-nofound"))
                 ctx.add_class("chip-miss")
+
+            # --- Highlight current weather ---
+            row = self.meteo_rows.get(rel)
+            if row:
+                row_ctx = row.get_style_context()
+                row_ctx.remove_class("meteo-current")
+
+                if self.weather_value and self.weather_value in rel:
+                    row_ctx.add_class("meteo-current")
+
 
         # Re-apply filter after refresh
         moment = getattr(self, "images_selected_moment", None) or None
