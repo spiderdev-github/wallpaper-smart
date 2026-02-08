@@ -2795,6 +2795,10 @@ class App(Gtk.Window):
         self.meteo_row_moment = {}
 
         for label, rel in items:
+            # Skip "clair" or anything containing "clair"
+            if "clair" in label.lower():
+                continue
+
             # --- Card container (same as Base) ---
             row = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             row.set_margin_top(10)
