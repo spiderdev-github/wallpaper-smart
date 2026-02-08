@@ -66,7 +66,7 @@ DEFAULT_CFG = {
 }
 
 APP_ID = "wallpaper-smart"
-APP_VERSION = "2.0.0"
+APP_VERSION = "1.0.0"
 LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
 
 
@@ -764,162 +764,201 @@ def apply_css(dark: bool):
         css = b"""
         * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
 
-        window { background: #FFFFFF; color: #1E1E1E; }
+        window {
+            background: #FAFAFA;
+            color: #2E3436;
+        }
 
         /* Header discret */
         .header {
-        padding: 12px 14px;
-        background: #FFFFFF;
-        border: 0;
+            padding: 12px 14px;
+            background: #F6F6F6;
+            border: 0;
         }
-        .header-title { font-size: 16px; font-weight: 800; color: #1E1E1E; }
-        .header-sub { font-size: 12px; color: rgba(30,30,30,0.60); }
+        .header-title {
+            font-size: 16px;
+            font-weight: 800;
+            color: #2E3436;
+        }
+        .header-sub {
+            font-size: 12px;
+            color: rgba(46,52,54,0.60);
+        }
 
         /* Notebook type GNOME (soft) */
         notebook { background: transparent; border: 0; }
         notebook header { background: transparent; border: 0; }
         notebook tab {
-        background: rgba(0,0,0,0.04);
-        border: 1px solid rgba(0,0,0,0.06);
-        border-radius: 10px;
-        padding: 6px 12px;
-        margin: 6px 6px 10px 0;
+            background: rgba(0,0,0,0.03);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 10px;
+            padding: 6px 12px;
+            margin: 6px 6px 10px 0;
         }
         notebook tab:checked {
-        background: rgba(0,0,0,0.06);
-        border-color: rgba(0,0,0,0.08);
+            background: rgba(0,0,0,0.06);
+            border-color: rgba(0,0,0,0.12);
+            box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.85);
         }
 
         /* Pages */
         .page { padding: 10px; }
 
-        /* Cards (blanches, bord fin) */
+        /* Cards */
         .card {
-        background: #FFFFFF;
-        border: 1px solid rgba(0,0,0,0.10);
-        border-radius: 14px;
-        padding: 12px;
+            background: #FFFFFF;
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 14px;
+            padding: 12px;
         }
-        .card-title { font-size: 13px; font-weight: 800; color: #1E1E1E; }
-        .muted { color: rgba(30,30,30,0.60); }
+        .card-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #2E3436;
+        }
+        .muted {
+            color: rgba(46,52,54,0.60);
+        }
 
         /* Inputs */
-        entry, spinbutton entry, combobox box {
-        background: #FFFFFF;
-        color: #1E1E1E;
-        border: 1px solid rgba(0,0,0,0.14);
-        border-radius: 12px;
-        padding: 10px;
+        entry, spinbutton entry {
+            background: #FFFFFF;
+            color: #2E3436;
+            border: 1px solid rgba(0,0,0,0.14);
+            border-radius: 12px;
+            padding: 10px;
         }
 
-        /* Buttons neutres */
+        /* Combobox */
+        combobox {
+            background: transparent;
+            border: 0;
+        }
+        combobox box {
+            background: #FFFFFF;
+            color: #2E3436;
+            border: 1px solid rgba(0,0,0,0.14);
+            border-radius: 999px;
+            padding: 10px 12px;
+        }
+        combobox button {
+            background: transparent;
+            border: 0;
+            padding: 0;
+        }
+        combobox box:hover {
+            background: rgba(0,0,0,0.04);
+        }
+        combobox:focus-within box {
+            box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.45);
+        }
+
+        /* Buttons */
         button {
-        background: rgba(0,0,0,0.04);
-        color: #1E1E1E;
-        border: 1px solid rgba(0,0,0,0.10);
-        border-radius: 999px;
-        padding: 8px 14px;
+            background: rgba(0,0,0,0.03);
+            color: #2E3436;
+            border: 1px solid rgba(0,0,0,0.12);
+            border-radius: 999px;
+            padding: 8px 14px;
         }
-        button:hover { background: rgba(0,0,0,0.06); }
+        button:hover {
+            background: rgba(0,0,0,0.06);
+        }
 
-        /* Accent Ubuntu (orange) */
+        /* Accent Ubuntu */
         .accent {
-        background: #E95420;
-        border-color: transparent;
-        color: #FFFFFF;
-        font-weight: 800;
+            background: #E95420;
+            border-color: transparent;
+            color: #FFFFFF;
+            font-weight: 800;
         }
         .accent:hover { background: #F06434; }
 
         /* Secondaire */
         .warn {
-        background: rgba(0,0,0,0.06);
-        border: 1px solid rgba(0,0,0,0.12);
-        color: #1E1E1E;
-        font-weight: 700;
+            background: rgba(0,0,0,0.04);
+            border: 1px solid rgba(0,0,0,0.12);
+            color: #2E3436;
+            font-weight: 700;
         }
         .warn:hover { background: rgba(0,0,0,0.08); }
 
         /* Chips */
         .chip {
-        border-radius: 999px;
-        padding: 2px 10px;
-        font-size: 12px;
-        font-weight: 700;
-        border: 1px solid rgba(0,0,0,0.12);
+            border-radius: 999px;
+            padding: 2px 10px;
+            font-size: 12px;
+            font-weight: 700;
+            border: 1px solid rgba(0,0,0,0.14);
         }
         .chip-ok {
-        background: rgba(46, 204, 113, 0.14);
-        color: #134B2C;
-        border-color: rgba(46, 204, 113, 0.22);
+            background: rgba(46, 204, 113, 0.18);
+            color: #1E7E4A;
+            border-color: rgba(46, 204, 113, 0.28);
         }
         .chip-miss {
-        background: rgba(231, 76, 60, 0.12);
-        color: #6A1F17;
-        border-color: rgba(231, 76, 60, 0.22);
+            background: rgba(231, 76, 60, 0.18);
+            color: #8E2C20;
+            border-color: rgba(231, 76, 60, 0.28);
         }
+
+        /* Switch */
+        .ws-switch { margin-left: 4px; }
+        switch {
+            background: rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.12);
+            border-radius: 999px;
+            padding: 2px;
+            min-width: 46px;
+            min-height: 24px;
+        }
+        switch:checked {
+            background: rgba(233, 84, 32, 0.92);
+            border-color: rgba(233, 84, 32, 1.0);
+        }
+        switch slider {
+            background: #FFFFFF;
+            border: 1px solid rgba(0,0,0,0.18);
+            border-radius: 50px;
+            min-width: 30px;
+            min-height: 20px;
+        }
+        switch:disabled { opacity: 0.6; }
 
         /* Actionbar */
         .actionbar {
-        padding: 10px;
-        background: #FFFFFF;
-        border: 0;
+            padding: 10px;
+            background: #F6F6F6;
+            border: 0;
         }
 
-        /* Tabs GNOME-like + icons */
-        .tab-icon { opacity: 0.90; }
-        .tab-text { font-weight: 700; }
-        notebook tab:checked {
-          box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.95);
-        }
-
-        button:focus,
-        button:focus-visible {
-            outline: none;
-            box-shadow: none;
-        }
-
-        notebook tab:focus,
-        notebook tab:focus-visible {
-            outline: none;
-            box-shadow: none;
-        }
-
-        entry:focus,
-        entry:focus-visible,
-        spinbutton:focus,
-        spinbutton:focus-visible,
-        combobox:focus,
-        combobox:focus-visible {
-            outline: none;
-            box-shadow: none;
-        }
+        /* Images & frames */
+        .ui-img-bx { padding: 15px; }
 
         .base-row {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 12px;
-        }
-
-        .base-row GtkLabel.muted {
-        margin-top: 6px;
+            background: rgba(0,0,0,0.02);
+            border: 1px solid rgba(0,0,0,0.08);
+            border-radius: 12px;
         }
 
         .img-frame {
-        border-radius: 12px;
+            border-radius: 12px;
+            border: 5px solid rgba(0,0,0,0.06);
+            padding: 20px 0;
         }
+        .img-frame image { border-radius: 12px; }
 
         .base-current {
-        border: 2px solid rgba(255, 160, 60, 0.9);
-        background: rgba(255, 160, 60, 0.10);
+            border: 2px solid rgba(255, 160, 60, 0.9);
+            background: rgba(255, 160, 60, 0.12);
         }
 
         .meteo-current {
-        border-left: 4px solid #ff9f3a;
-        background: rgba(255, 159, 58, 0.08);
+            border-left: 4px solid #ff9f3a;
+            background: rgba(255, 159, 58, 0.10);
         }
-
         """
+
 
 
     provider = Gtk.CssProvider()
@@ -1149,14 +1188,18 @@ def ensure_overrides(cfg):
 
     (user_systemd / f"{SERVICE}.d" / "override.conf").write_text(
         "[Service]\n"
-        f"Environment=CONFIG_FILE={CFG_PATH}\n",
+        f"Environment=CONFIG_FILE={CFG_PATH}\n"
+        "ExecStartPre=/bin/sleep 5\n",
+
         encoding="utf-8"
     )
 
     minutes = int(cfg.get("timer_minutes", 10))
     (user_systemd / f"{TIMER}.d" / "override.conf").write_text(
         "[Timer]\n"
-        f"OnUnitActiveSec={minutes}min\n",
+        "OnStartupSec=10s\n"
+        f"OnUnitActiveSec={minutes}min\n"
+        "Persistent=true\n",
         encoding="utf-8"
     )
 
@@ -2712,9 +2755,17 @@ class App(Gtk.Window):
 
 
     def _on_base_card_clicked(self, widget, event, moment_key: str):
-        # Reuse your previous selection handler
-        # If your on_base_selected expects (listbox, row), adapt here
-        self.on_base_selected(None, self.base_rows[moment_key][0])
+        # Remove class from all base cards
+        for _mk, (row, *_rest) in self.base_rows.items():
+            ctx = row.get_style_context()
+            ctx.remove_class("base-current")
+
+        # Add class to clicked card
+        row = self.base_rows[moment_key][0]
+        row.get_style_context().add_class("base-current")
+
+        # Keep existing behavior
+        self.on_base_selected(None, row)
         return True
 
 
