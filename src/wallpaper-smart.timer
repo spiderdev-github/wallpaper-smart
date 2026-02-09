@@ -3,7 +3,7 @@
 Description=Run smart wallpaper updater every 10 minutes
 
 [Timer]
-OnBootSec=30s
+OnBootSec=1s
 OnUnitActiveSec=10min
 Persistent=true
 

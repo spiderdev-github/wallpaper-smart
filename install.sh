@@ -436,7 +436,7 @@ EOF
   mkdir -p "$HOME/.config/systemd/user/wallpaper-smart.timer.d"
   cat > "$HOME/.config/systemd/user/wallpaper-smart.timer.d/override.conf" <<EOF
 [Timer]
-OnStartupSec=10s
+OnStartupSec=1s
 OnUnitActiveSec=${MINUTES}min
 Persistent=true
 EOF
