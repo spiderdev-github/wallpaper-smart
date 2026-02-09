@@ -402,20 +402,43 @@ chmod +x uninstall.sh
 
 ---
 
-## 🗺️ Roadmap
+# 🗺️ Roadmap
 
-- [x] Add an “About” section in the interface
-- [x] Add a “Donate” button
-- [x] Improve logs (more readable interface)
-- [x] KDE Plasma support
-- [x] Real-time weather for preset locations
-- [x] Add multi-language support
-- [x] Detect geolocation during installation to set default latitude/longitude (optional)
-- [x] Geolocation section: in “City” mode, retrieve latitude/longitude from the entered city
-- [x] Allow dark and light theme management for wallpapers
-- [ ] Advanced theme management (preview + import/export)
-- [ ] Advanced scheduling: add minute support for time slots (dawn / noon / sunset / night)
-- [x] UI improvement (wallpaper status): when a weather image is missing, display a warning icon
+Wallpaper-Smart is evolving step by step to become a **smart, flexible and fully customizable weather-based wallpaper engine**.
+
+### ✅ Completed
+- Multi-language interface support  
+- KDE Plasma compatibility  
+- Real-time weather integration for predefined locations  
+- Automatic geolocation detection during installation (optional)  
+- City-based geolocation with automatic latitude/longitude retrieval  
+- Dark & light wallpaper theme support  
+- Improved logging with a cleaner and more readable interface  
+- Visual warning when a weather wallpaper is missing  
+- About section and donation support  
+
+### 🧩 Theme Experience (Upcoming)
+- Advanced theme management with live preview  
+- Import / export themes to easily share creations  
+- Localized theme names using language support in `theme.json`  
+- Cleaner UI: move wallpaper folder management from dashboard to the theme tab  
+
+### ⏱️ Smart Scheduling
+- Minute-level precision for time slots (dawn, noon, sunset, night)  
+- Intelligent scheduling backend:
+  - Automatic use of `systemd` when available  
+  - Fallback to `crontab` on systems without `systemd`  
+  - Dynamic update of execution frequency without manual intervention  
+
+### 🌦️ Weather & Interaction
+- Interactive weather panel  
+- Clickable weather rows to preview and select associated images  
+
+---
+
+✨ **Long-term vision**:  
+Wallpaper-Smart aims to provide a seamless, OS-friendly and extensible solution for dynamic wallpapers driven by real-world weather and time conditions.
+
 
 ---
 

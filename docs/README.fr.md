@@ -406,20 +406,42 @@ chmod +x uninstall.sh
 
 ---
 
-## 🗺️ Feuille de route
+# 🗺️ Roadmap
 
-- [x] Ajout d’une section « À propos » dans l’interface
-- [x] Ajout d’un bouton « Faire un don »
-- [x] Amélioration des logs (interface plus lisible)
-- [x] Support KDE Plasma
-- [x] Météo en temps réel pour les presets
-- [x] Support multilingue
-- [x] Détection de la géolocalisation à l’installation (optionnel)
-- [x] Géolocalisation : en mode « Ville », récupérer lat/lon à partir de la ville saisie
-- [x] Gestion des fonds clair / sombre
-- [ ] Gestion avancée des thèmes (aperçu + import/export)
-- [ ] Planification avancée : ajouter le support des minutes (aube / midi / coucher / nuit)
-- [x] Amélioration UI (statut du fond) : afficher une icône d’avertissement si une image météo manque
+Wallpaper-Smart évolue progressivement pour devenir un **moteur de fonds d’écran intelligent, flexible et entièrement personnalisable**, basé sur la météo et le moment de la journée.
+
+### ✅ Fonctionnalités terminées
+- Support multi-langue de l’interface  
+- Compatibilité KDE Plasma  
+- Intégration météo en temps réel pour des emplacements prédéfinis  
+- Détection automatique de la géolocalisation lors de l’installation (optionnelle)  
+- Géolocalisation par ville avec récupération automatique de la latitude et longitude  
+- Gestion des thèmes de fonds d’écran en mode clair et sombre  
+- Amélioration des logs avec une interface plus lisible  
+- Alerte visuelle lorsqu’un fond d’écran météo est manquant  
+- Section “À propos” et bouton de don  
+
+### 🧩 Expérience des thèmes (à venir)
+- Gestion avancée des thèmes avec aperçu en temps réel  
+- Import / export de thèmes pour faciliter le partage  
+- Localisation des noms de thèmes via la gestion des langues dans `theme.json`  
+- Interface épurée : déplacement de la gestion des dossiers de fonds d’écran du tableau de bord vers l’onglet thèmes  
+
+### ⏱️ Planification intelligente
+- Précision à la minute pour les créneaux horaires (aube, midi, coucher du soleil, nuit)  
+- Moteur de planification intelligent :
+  - Utilisation automatique de `systemd` lorsqu’il est disponible  
+  - Repli sur `crontab` en l’absence de `systemd`  
+  - Mise à jour dynamique de la fréquence d’exécution sans intervention manuelle  
+
+### 🌦️ Météo & interactions
+- Panneau météo interactif  
+- Lignes météo cliquables pour prévisualiser et sélectionner les images associées  
+
+---
+
+✨ **Vision à long terme** :  
+Wallpaper-Smart vise à offrir une solution fluide, respectueuse du système et extensible pour gérer des fonds d’écran dynamiques basés sur des conditions réelles (météo et temps).
 
 ---
 
