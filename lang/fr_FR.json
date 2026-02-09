@@ -13,7 +13,7 @@
   "ui.menu-time": "Horaires",
   "ui.menu-geoloc": "Localisation",
   "ui.menu-mapping": "Mapping",
-  "ui.menu-images": "Images",
+  "ui.menu-images": "Thèmes",
   "ui.menu-about": "À propos",
   "ui.saved-successfully": "Configuration sauvegardée et systemd rechargé.",
   "ui.test-result": "Résultat test",

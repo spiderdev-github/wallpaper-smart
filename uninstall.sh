@@ -23,7 +23,7 @@ Options:
 Examples:
   $0
   $0 --remove-config
-  $0 --remove-wallpapers --wallpapers-dir "$HOME/Images/wallpaper"
+  $0 --remove-wallpapers --wallpapers-dir "$HOME/.config/wallpaper-smart/wallpaper"
 EOF
 }
 

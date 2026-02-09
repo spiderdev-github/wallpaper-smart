@@ -1049,7 +1049,6 @@ def prettify_meteo_value_log(line: str) -> str:
 
     moment, bucket, _prefix, candidate, code, lat, lon = m.groups()
 
-    print(f"meteo: {_prefix}")
     return _prefix
 
 
@@ -1346,11 +1345,11 @@ class App(Gtk.Window):
         self.nb.append_page(self.build_tab_geoloc(),  make_tab_label(_("ui.menu-geoloc"),   "mark-location-symbolic"))
         self.refresh_preset_icons_async()
 
-        self.nb.append_page(self.build_tab_mapping(), make_tab_label(_("ui.menu-mapping"), "view-list-symbolic"))
-
         # Images: garder une référence pour rebuild safe
         self.nb.append_page(self.build_tab_images(), make_tab_label(_("ui.menu-images"), "image-x-generic-symbolic"))
 
+        self.nb.append_page(self.build_tab_mapping(), make_tab_label(_("ui.menu-mapping"), "view-list-symbolic"))
+        
         # btn tab About
         self.nb.append_page(self.build_tab_about(), make_tab_label(_("ui.menu-about"), "help-about-symbolic"))
 
@@ -1389,7 +1388,7 @@ class App(Gtk.Window):
         bar.pack_end(self.btn_toggle, False, False, 0)
 
 
-        self.refresh_images_preview()
+        # self.refresh_images_preview()
         # Then every 10 minutes (avoid hammering API)
         GLib.timeout_add_seconds(600, self._timer_refresh_preset_icons)
 
@@ -1847,7 +1846,6 @@ class App(Gtk.Window):
         theme_id = self.wall_theme_combo.get_active_id() or "default"
         self.cfg["wallpaper_theme"] = theme_id
         self.wall_theme_combo.set_active_id(theme_id)
-        # self.rebuild_images_tab(focus=False)
         self.refresh_images_preview()
         
     def build_dashboard_card(self) -> Gtk.Widget:
@@ -1910,7 +1908,6 @@ class App(Gtk.Window):
 
     def refresh_dashboard(self):
         """Update dashboard values from config + last service logs."""
-        print(" -- refresh dashboard --")
         try:
             # Timer status
             active = is_timer_active()
@@ -2311,70 +2308,9 @@ class App(Gtk.Window):
 
         top = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
 
-        # Actions : refresh preview, open base folder, open meteo folder, create placeholders
-        btn_refresh = Gtk.Button(label=_("tab.images.card-action.btn-refresh"))
-        btn_refresh.connect("clicked", lambda _b: self.refresh_images_preview())
-        
-        # Placeholders : create empty files for all moments+meteo conditions, to help users add their own wallpapers
-        btn_placeholders = Gtk.Button(label=_("tab.images.card-action.btn-create-placeholder"))
-        btn_placeholders.connect("clicked", self.on_create_placeholders)
-
-        # Open base folder in file manager
-        btn_open_base = Gtk.Button(label=_("tab.images.card-action.btn-open-base"))
-        btn_open_base.connect("clicked", lambda _b: self._open_subdir(f"{self.style_list.get_active_id()}/base", themed=True))
-        # Open meteo folder in file manager
-        btn_open_meteo = Gtk.Button(label=_("tab.images.card-action.btn-open-weather"))
-        btn_open_meteo.connect("clicked", lambda _b: self._open_subdir(f"{self.style_list.get_active_id()}/meteo", themed=True))
-        
-        # # Cursors
-        set_hand_cursor_on_hover(btn_refresh)
-        # set_hand_cursor_on_hover(btn_placeholders)
-        set_hand_cursor_on_hover(btn_open_base)
-        set_hand_cursor_on_hover(btn_open_base)
-        set_hand_cursor_on_hover(btn_open_meteo)
-
-        # # Layout
-        top.pack_start(btn_refresh, False, False, 0)
-        # top.pack_start(btn_placeholders, False, False, 0)
-        top.pack_start(btn_open_base, False, False, 0)
-        top.pack_start(btn_open_meteo, False, False, 0)
-
-        # # add top to main card
-        page.pack_start(make_card(_("tab.images.card-action.title"), top), False, False, 0)
-
-        
         # --- Wallpaper theme ---
         self.wall_theme_card = self.build_wallpaper_theme_card()
         page.pack_start(self.wall_theme_card, False, False, 0)
-
-        # # --- Styles theme ---
-        # self.style_theme_card = self.build_style_theme_card()
-        # page.pack_start(self.style_theme_card, False, False, 0)
-
-
-
-
-        # header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        # header.set_hexpand(True)
-
-        # # add ComboBoxText width 100% width dark ou light
-        # self.style_list = Gtk.ComboBoxText()
-        # self.style_list.append("dark",  "☾ " + _("tab.images.style-list.dark"))
-        # self.style_list.append("light", "☀  " + _("tab.images.style-list.light"))
-        # self.style_list.connect("changed", self.on_style_changed)
-        
-        # # la valeur par défault ets "desktop_style" dans le config, sinon dark
-        # current_style = self.cfg.get("desktop_style", "dark")
-        # if current_style == "light":
-        #     self.style_list.set_active(1)
-        # else:   
-        #     self.style_list.set_active(0)  # Default to dark mode
-        # header.pack_start(self.style_list, False, False, 0)
-        
-        # # add top to main card
-        # page.pack_start(make_card(_("tab.images.card-action.style"), header), False, False, 0)
-
-        
 
         # Split view 50/50 (modifiable ensuite en glissant)
         paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
@@ -2406,6 +2342,40 @@ class App(Gtk.Window):
         paned.pack1(base_panel, resize=True, shrink=False)
         paned.pack2(meteo_panel, resize=True, shrink=False)
 
+
+        # Actions : refresh preview, open base folder, open meteo folder, create placeholders
+        # btn_refresh = Gtk.Button(label=_("tab.images.card-action.btn-refresh"))
+        # btn_refresh.connect("clicked", lambda _b: self.refresh_images_preview())
+        
+        # Placeholders : create empty files for all moments+meteo conditions, to help users add their own wallpapers
+        btn_placeholders = Gtk.Button(label=_("tab.images.card-action.btn-create-placeholder"))
+        btn_placeholders.connect("clicked", self.on_create_placeholders)
+
+        # Open base folder in file manager
+        btn_open_base = Gtk.Button(label=_("tab.images.card-action.btn-open-base"))
+        btn_open_base.connect("clicked", lambda _b: self._open_subdir(f"{self.style_list.get_active_id()}/base", themed=True))
+        # Open meteo folder in file manager
+        btn_open_meteo = Gtk.Button(label=_("tab.images.card-action.btn-open-weather"))
+        btn_open_meteo.connect("clicked", lambda _b: self._open_subdir(f"{self.style_list.get_active_id()}/meteo", themed=True))
+        
+        # # Cursors
+        #set_hand_cursor_on_hover(btn_refresh)
+        # set_hand_cursor_on_hover(btn_placeholders)
+        set_hand_cursor_on_hover(btn_open_base)
+        set_hand_cursor_on_hover(btn_open_base)
+        set_hand_cursor_on_hover(btn_open_meteo)
+
+        # # Layout
+        #top.pack_start(btn_refresh, False, False, 0)
+        # top.pack_start(btn_placeholders, False, False, 0)
+        top.pack_start(btn_open_base, False, False, 0)
+        top.pack_start(btn_open_meteo, False, False, 0)
+
+        # # add top to main card
+        page.pack_start(make_card(_("tab.images.card-action.title"), top), False, False, 0)
+
+
+        
         # Refresh previews + default selection = moment courant
         try:
             moment_now = self._compute_current_moment_key()
@@ -2786,6 +2756,19 @@ class App(Gtk.Window):
         self.on_base_selected(None, row)
         return True
 
+    def _on_meteo_card_clicked(self, widget, event, meteo_key: str):
+        # Remove class from all meteo cards
+        for _mk, (row, *_rest) in self.base_rows.items():
+            ctx = row.get_style_context()
+            ctx.remove_class("remove-current")
+
+        # Add class to clicked card
+        # row = self.base_rows[moment_key][0]
+        # row.get_style_context().add_class("base-current")
+
+        # # Keep existing behavior
+        # self.on_base_selected(None, row)
+        return True
 
 
     def _build_meteo_panel(self, items: List[Tuple[str, str]]) -> Gtk.Widget:
@@ -2878,6 +2861,8 @@ class App(Gtk.Window):
             img_frame.set_shadow_type(Gtk.ShadowType.NONE)
             img_frame.get_style_context().add_class("img-frame")
             img_frame.add(img)
+
+            # img_frame.connect("button-press-event", self._on_meteo_card_clicked, label)
 
             box.pack_start(img_frame, False, False, 0)
 
@@ -2978,33 +2963,6 @@ class App(Gtk.Window):
         return items
 
     # ------- Actions -------
-
-    
-    def rebuild_images_tab(self, focus: bool = True):
-        """Rebuild the Images tab safely (keeps its position, no fixed index)."""
-        try:
-            insert_at = -1
-            if hasattr(self, "images_tab"):
-                insert_at = self.nb.page_num(self.images_tab)
-                if insert_at != -1:
-                    self.nb.remove_page(insert_at)
-
-            self.images_tab = self.build_tab_images()
-            tab_label = make_tab_label("Images", "image-x-generic-symbolic")
-
-            if insert_at != -1:
-                self.nb.insert_page(self.images_tab, tab_label, insert_at)
-            else:
-                self.nb.append_page(self.images_tab, tab_label)
-
-            self.nb.show_all()
-
-            if focus:
-                idx = self.nb.page_num(self.images_tab)
-                if idx != -1:
-                    self.nb.set_current_page(idx)
-        except Exception as e:
-            self.message("Erreur", f"{_('Impossible de reconstruire l\'onglet Images')}\n{e}")
 
     def refresh_toggle_label(self):
         self.btn_toggle.set_label(_("btn.tolggle.off") if is_timer_active() else _("btn.tolggle.on"))
@@ -3334,7 +3292,7 @@ class App(Gtk.Window):
         #print(f"dest: {dst}")
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(src.read_bytes())
-        self.refresh_images_preview()
+        self.refresh_images_preview(rel_path)
 
     def _rel_swap_style(self, rel: str, style: str) -> str:
         parts = list(Path(rel).parts)
@@ -3360,13 +3318,19 @@ class App(Gtk.Window):
 
 
 
-    def refresh_images_preview(self):
+    def refresh_images_preview(self, upload_img=None):
         root = Path(self.folder_entry.get_text().strip())
         enabled_map = self.cfg.get("enabled_images", {})
 
         cur_style = self.style_list.get_active_id() or "dark"
         cur_theme = self.wall_theme_combo.get_active_id() or "default"
+        
+        active_moment = active_meteo = None
 
+        if upload_img is not None:
+            active_moment = upload_img.split("_")[-1].replace(".png", "")
+            active_meteo = upload_img.split("_")[0].replace("meteo/", "")
+            
         # --- Base previews (left) ---
         moment_now = None
         try:
@@ -3407,8 +3371,12 @@ class App(Gtk.Window):
                 # --- Highlight current moment ---
                 row_ctx = _row.get_style_context()
                 row_ctx.remove_class("base-current")
-                if moment_now and moment_key == moment_now:
+                
+                highlight_key = active_moment or moment_now
+                if highlight_key and moment_key == highlight_key:
                     row_ctx.add_class("base-current")
+
+
 
 
         
@@ -3451,8 +3419,23 @@ class App(Gtk.Window):
                 row_ctx = row.get_style_context()
                 row_ctx.remove_class("meteo-current")
 
-                if self.weather_value and self.weather_value in rel:
+                highlight_key = active_meteo or (self.weather_value and self.weather_value in rel)
+                # print(f"active_meteo: {active_meteo}")
+                # print(f"highlight_key: {highlight_key}")
+                # print(f"weather_value: {self.weather_value}")
+                # print(f"rel: {rel}")
+                # print("-------------------------------------------")
+                if(active_meteo is not None and active_meteo in rel):
                     row_ctx.add_class("meteo-current")
+                else: 
+                    if self.weather_value and self.weather_value in rel:
+                        row_ctx.add_class("meteo-current")
+        
+                #      row_ctx.add_class("meteo-current")
+                # if highlight_key and highlight_key in rel:
+                #     row_ctx.add_class("meteo-current")
+                # else if self.weather_value and self.weather_value in rel:
+                #      row_ctx.add_class("meteo-current")
 
 
         # Re-apply filter after refresh
