@@ -34,21 +34,7 @@ DESKTOP="${DESKTOP,,}"  # lowercase
 # -----------------------------
 set_wallpaper_kde() {
   local file="$1"
-
-  command -v qdbus >/dev/null 2>&1 || {
-    log "ERREUR: qdbus manquant (installe: sudo apt install qdbus-qt5)"
-    return 1
-  }
-
-  qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "
-var allDesktops = desktops();
-for (i=0; i<allDesktops.length; i++) {
-  d = allDesktops[i];
-  d.wallpaperPlugin = 'org.kde.image';
-  d.currentConfigGroup = Array('Wallpaper','org.kde.image','General');
-  d.writeConfig('Image', 'file://$file');
-}
-"
+  plasma-apply-wallpaperimage "$file"
 }
 
 # -----------------------------
@@ -267,11 +253,11 @@ if [[ -f "$STATE_JSON" ]]; then
 fi
 
 # If same rel and target already exists, do nothing
-if [[ -n "$PREV_REL" && "$PREV_REL" == "$REL_CHOSEN" && -f "$TARGET" ]]; then
-  log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | candidate=$HAVE_CANDIDATE | code=$CODE | LAT=$LAT LON=$LON)"
-  log "==> Wallpaper unchanged, skip apply (rel=$REL_CHOSEN)"
-  exit 0
-fi
+#if [[ -n "$PREV_REL" && "$PREV_REL" == "$REL_CHOSEN" && -f "$TARGET" ]]; then
+#  log "✅ Wallpaper: $CHOSEN (moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | candidate=$HAVE_CANDIDATE | code=$CODE | LAT=$LAT LON=$LON)"
+#  log "==> Wallpaper unchanged, skip apply (rel=$REL_CHOSEN)"
+#  exit 0
+#fi
 
 # Write new state (even if apply may fail later, this avoids loops)
 jq -n \
@@ -303,7 +289,7 @@ if [[ "$DESKTOP" == *"gnome"* ]]; then
   fi
 
 elif [[ "$DESKTOP" == *"kde"* || "$DESKTOP" == *"plasma"* ]]; then
-  if set_wallpaper_kde "$TARGET"; then
+  if set_wallpaper_kde "$CHOSEN"; then
     log "✅ Wallpaper: $CHOSEN (KDE | moment=$MOMENT | bucket=$WEATHER_BUCKET | prefix=$PREFIX | candidate=$HAVE_CANDIDATE | code=$CODE | LAT=$LAT LON=$LON)"
   else
     log "WARN: echec KDE. Fichier pret: $TARGET"
