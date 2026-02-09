@@ -277,6 +277,7 @@ fi
 # -----------------------------
 log "Création dossiers utilisateur..."
 mkdir -p "$HOME/.local/bin"
+mkdir -p "$HOME/.config/systemd/user"
 mkdir -p "$HOME/.local/share/applications"
 mkdir -p "$CFG_DIR"
 mkdir -p "$WALLDIR"
@@ -424,7 +425,7 @@ if [[ "$HAS_SYSTEMD" == "1" ]]; then
   install -m 644 "$SRC/wallpaper-smart.timer" "$HOME/.config/systemd/user/wallpaper-smart.timer"
   install -m 644 "$SRC/wallpaper-smart-style-hook.path" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.path"
   
-  log "Création overrides systemd (CONFIG_FILE + fréquence)..."
+  log "Creation overrides systemd (CONFIG_FILE + frequence)..."
   mkdir -p "$HOME/.config/systemd/user/wallpaper-smart.service.d"
   cat > "$HOME/.config/systemd/user/wallpaper-smart.service.d/override.conf" <<EOF
 [Service]
@@ -444,28 +445,28 @@ EOF
   systemctl --user daemon-reload || true
   
   systemctl --user enable --now wallpaper-smart.service || true
-  systemctl --user start -now wallpaper-smart.service
+  systemctl --user start --now wallpaper-smart.service || true
 
   systemctl --user enable --now wallpaper-smart.timer || true
   systemctl --user start --now wallpaper-smart.timer || true
 
   log "Activation hook changement de style (systemd path)..."
-  systemctl --user enable --now wallpaper-smart-style-hook.path || true
+  systemctl --user enable  --now wallpaper-smart-style-hook.path || true
 else
-  warn "systemd user non détecté -> timer non installé."
+  warn "systemd user non detecte -> timer non installe."
   warn "Tu peux lancer le script manuellement, ou le planifier via cron/anacron."
 fi
 
 # -----------------------------
 # Desktop entry
 # -----------------------------
-log "Création .desktop..."
+log "Creation .desktop..."
 DESKTOP="$HOME/.local/share/applications/wallpaper-smart.desktop"
 cat > "$DESKTOP" <<EOF
 [Desktop Entry]
 Type=Application
 Name=Wallpaper Smart
-Comment=Configurer le fond d’écran dynamique (heure + météo)
+Comment=Configurer le fond d'ecran dynamique (heure + meteo)
 Keywords=wallpaper;fond;meteo;
 Exec=$HOME/.local/bin/wallpaper-smart-ui
 Icon=preferences-desktop-wallpaper
@@ -479,7 +480,7 @@ if has update-desktop-database; then
   update-desktop-database "$HOME/.local/share/applications" >/dev/null 2>&1 || true
 fi
 
-log "✅ Installation terminée."
+log "✅ Installation terminee."
 echo ""
 echo "📁 Arborescence wallpapers :"
 echo "  $WALLDIR/"
