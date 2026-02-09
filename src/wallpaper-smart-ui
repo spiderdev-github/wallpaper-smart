@@ -1585,8 +1585,8 @@ class App(Gtk.Window):
         page.pack_start(self.dashboard_card, False, False, 0)
 
         # --- Wallpaper theme ---
-        self.wall_theme_card = self.build_wallpaper_theme_card()
-        page.pack_start(self.wall_theme_card, False, False, 0)
+        #self.wall_theme_card = self.build_wallpaper_theme_card()
+        #page.pack_start(self.wall_theme_card, False, False, 0)
 
         # --- Langue ---
         self.language_card = self.build_language_card()
@@ -1625,7 +1625,7 @@ class App(Gtk.Window):
         page.pack_start(make_card(_("tab.setting.wallpaper-card.title"), content), False, False, 0)
 
         # Refresh dashboard once UI is built
-        self.refresh_dashboard()
+        # self.refresh_dashboard()
         return make_page(page)
 
     def build_language_card(self):
@@ -1703,47 +1703,47 @@ class App(Gtk.Window):
                 self.message(msg, hint)
                 break
     
-    def _build_images_wallpaper_theme_card(self) -> Gtk.Widget:
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    # def _build_images_wallpaper_theme_card(self) -> Gtk.Widget:
+    #     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         
-        # get list of themes
-        themes = getattr(self, "wallpaper_themes", None)
-        if not themes:
-            themes = load_wallpaper_themes(self.cfg.get("wallpaper_dir", ""))
+    #     # get list of themes
+    #     themes = getattr(self, "wallpaper_themes", None)
+    #     if not themes:
+    #         themes = load_wallpaper_themes(self.cfg.get("wallpaper_dir", ""))
         
-        # get current theme
-        current = (self.cfg.get("wallpaper_theme") or "default")
-        if current not in [k for k, _ in themes]:
-            current = "default"
+    #     # get current theme
+    #     current = (self.cfg.get("wallpaper_theme") or "default")
+    #     if current not in [k for k, _ in themes]:
+    #         current = "default"
 
-        self.img_wall_theme_combo = Gtk.ComboBoxText()
-        for key, label in themes:
-            self.img_wall_theme_combo.append(key, label)
+    #     self.img_wall_theme_combo = Gtk.ComboBoxText()
+    #     for key, label in themes:
+    #         self.img_wall_theme_combo.append(key, label)
 
-        self.img_wall_theme_combo.set_active_id(current)
-        self.img_wall_theme_combo.connect("changed", lambda _b: self.refresh_images_preview())
+    #     self.img_wall_theme_combo.set_active_id(current)
+    #     self.img_wall_theme_combo.connect("changed", lambda _b: self.refresh_images_preview())
         
-        box.pack_start(self.img_wall_theme_combo, False, False, 0)
-        disable_scroll_change(self.img_wall_theme_combo)
+    #     box.pack_start(self.img_wall_theme_combo, False, False, 0)
+    #     disable_scroll_change(self.img_wall_theme_combo)
 
-        self.style_list = Gtk.ComboBoxText()
-        self.style_list.append("dark",  "☾ " + _("tab.images.style-list.dark"))
-        self.style_list.append("light", "☀  " + _("tab.images.style-list.light"))
+    #     self.style_list = Gtk.ComboBoxText()
+    #     self.style_list.append("dark",  "☾ " + _("tab.images.style-list.dark"))
+    #     self.style_list.append("light", "☀  " + _("tab.images.style-list.light"))
         
-        # la valeur par défault ets "desktop_style" dans le config, sinon dark
-        current_style = self.cfg.get("desktop_style", "dark")
-        if current_style == "light":
-            self.style_list.set_active(1)
-        else:   
-            self.style_list.set_active(0)  # Default to dark mode
+    #     # la valeur par défault ets "desktop_style" dans le config, sinon dark
+    #     current_style = self.cfg.get("desktop_style", "dark")
+    #     if current_style == "light":
+    #         self.style_list.set_active(1)
+    #     else:   
+    #         self.style_list.set_active(0)  # Default to dark mode
 
-        self.style_list.connect("changed", lambda _b: self.refresh_images_preview())
+    #     self.style_list.connect("changed", lambda _b: self.refresh_images_preview())
         
-        box.pack_start(self.style_list, False, False, 0)
-        disable_scroll_change(self.style_list)
+    #     box.pack_start(self.style_list, False, False, 0)
+    #     disable_scroll_change(self.style_list)
 
 
-        return make_card(_("tab.setting.theme-card.title"), box)
+    #     return make_card(_("tab.setting.theme-card.title"), box)
     
     def build_wallpaper_theme_card(self, no_label=False) -> Gtk.Widget:
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -1778,6 +1778,23 @@ class App(Gtk.Window):
         row.pack_start(eb, True, True, 0)
         box.pack_start(row, False, False, 0)
         
+
+        self.style_list = Gtk.ComboBoxText()
+        self.style_list.append("dark",  "☾ " + _("tab.images.style-list.dark"))
+        self.style_list.append("light", "☀  " + _("tab.images.style-list.light"))
+        
+        # la valeur par défault ets "desktop_style" dans le config, sinon dark
+        current_style = self.cfg.get("desktop_style", "dark")
+        if current_style == "light":
+            self.style_list.set_active(1)
+        else:   
+            self.style_list.set_active(0)  # Default to dark mode
+
+        self.style_list.connect("changed", lambda _b: self.refresh_images_preview())
+        
+        box.pack_start(self.style_list, False, False, 0)
+        disable_scroll_change(self.style_list)
+
         if no_label :
             help_lbl = Gtk.Label(label=_("tab.setting.theme-card.legend"), xalign=0)
             help_lbl.set_line_wrap(True)
@@ -1829,7 +1846,7 @@ class App(Gtk.Window):
     def on_wall_theme_changed(self, _combo):
         theme_id = self.wall_theme_combo.get_active_id() or "default"
         self.cfg["wallpaper_theme"] = theme_id
-        self.img_wall_theme_combo.set_active_id(theme_id)
+        self.wall_theme_combo.set_active_id(theme_id)
         # self.rebuild_images_tab(focus=False)
         self.refresh_images_preview()
         
@@ -1893,6 +1910,7 @@ class App(Gtk.Window):
 
     def refresh_dashboard(self):
         """Update dashboard values from config + last service logs."""
+        print(" -- refresh dashboard --")
         try:
             # Timer status
             active = is_timer_active()
@@ -2326,7 +2344,7 @@ class App(Gtk.Window):
 
         
         # --- Wallpaper theme ---
-        self.wall_theme_card = self._build_images_wallpaper_theme_card()
+        self.wall_theme_card = self.build_wallpaper_theme_card()
         page.pack_start(self.wall_theme_card, False, False, 0)
 
         # # --- Styles theme ---
@@ -3305,7 +3323,7 @@ class App(Gtk.Window):
         root = Path(self.folder_entry.get_text().strip())
         chosen = pick_file(self, f"Choisir {rel_path}", root)
 
-        theme = self.img_wall_theme_combo.get_active_id()
+        theme = self.wall_theme_combo.get_active_id()
         css = self.style_list.get_active_id()
 
         if not chosen:
@@ -3347,7 +3365,7 @@ class App(Gtk.Window):
         enabled_map = self.cfg.get("enabled_images", {})
 
         cur_style = self.style_list.get_active_id() or "dark"
-        cur_theme = self.img_wall_theme_combo.get_active_id() or "default"
+        cur_theme = self.wall_theme_combo.get_active_id() or "default"
 
         # --- Base previews (left) ---
         moment_now = None
@@ -3546,7 +3564,7 @@ class App(Gtk.Window):
             (root / "templates" / theme / "light/meteo").mkdir(parents=True, exist_ok=True)
 
             # rebuild Images tab (mapping dynamic)
-            self.img_wall_theme_combo.set_active_id(theme_id)
+            self.wall_theme_combo.set_active_id(theme_id)
 
             idx_back = self.nb.page_num(current_widget)
             if idx_back != -1:
@@ -3561,6 +3579,7 @@ class App(Gtk.Window):
 
     def on_test(self, _btn):
         try:
+            print(" -- on_test --")
             # 1) Construire une config temporaire depuis l'UI (sans sauvegarder la vraie)
             cfg = json.loads(json.dumps(self.cfg))  # copie safe
 
