@@ -37,7 +37,7 @@ CITY_DEFAULT="Paris"
 NO_GEO=0
 
 WALLDIR="$WALLDIR_DEFAULT"
-MINUTES="5"
+MINUTES="1"
 NO_DEPS=0
 FORCE_TEMPLATES=0
 
@@ -422,7 +422,6 @@ if [[ "$HAS_SYSTEMD" == "1" ]]; then
   mkdir -p "$HOME/.config/systemd/user"
   install -m 644 "$SRC/wallpaper-smart.service" "$HOME/.config/systemd/user/wallpaper-smart.service"
   install -m 644 "$SRC/wallpaper-smart.timer" "$HOME/.config/systemd/user/wallpaper-smart.timer"
-  # install -m 644 "$SRC/wallpaper-smart-style-hook.service" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.service"
   install -m 644 "$SRC/wallpaper-smart-style-hook.path" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.path"
   
   log "Création overrides systemd (CONFIG_FILE + fréquence)..."
@@ -441,9 +440,15 @@ OnUnitActiveSec=${MINUTES}min
 Persistent=true
 EOF
 
-  log "Activation timer systemd..."
+  log "Activation service & timer systemd..."
   systemctl --user daemon-reload || true
+  
+  systemctl --user enable --now wallpaper-smart.service || true
+  systemctl --user start -now wallpaper-smart.service
+
   systemctl --user enable --now wallpaper-smart.timer || true
+  systemctl --user start --now wallpaper-smart.timer || true
+
   log "Activation hook changement de style (systemd path)..."
   systemctl --user enable --now wallpaper-smart-style-hook.path || true
 else
