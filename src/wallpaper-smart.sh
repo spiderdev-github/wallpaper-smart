@@ -100,10 +100,16 @@ to_minutes() {
   if [[ "$v" =~ ^([0-9]{1,2}):([0-9]{1,2})$ ]]; then
     local h="${BASH_REMATCH[1]}"
     local m="${BASH_REMATCH[2]}"
+
+    # Force base 10 to avoid octal issue (08/09)
+    h=$((10#$h))
+    m=$((10#$m))
+
     (( h < 0 )) && h=0
     (( h > 23 )) && h=23
     (( m < 0 )) && m=0
     (( m > 59 )) && m=59
+
     echo $((h*60 + m))
     return 0
   fi

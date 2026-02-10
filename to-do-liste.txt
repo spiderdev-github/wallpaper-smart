@@ -6,3 +6,7 @@
 [ ] Times: change frequence => if has systemd update service else crontab
 [x] switch light/dark 
 [x] remove refresh_preview where on_save (or/and reduce size of wallpaper)
+[x] auto load schedules
+[ ] disable delete schedule if auto load
+[x] when change location reload shedules if auto load is on
+[ ] onload if auto schedule disable time inputs

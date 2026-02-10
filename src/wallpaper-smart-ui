@@ -6,6 +6,7 @@ import urllib.request
 
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Dict
+from datetime import datetime
 
 import gi
 import threading
@@ -642,53 +643,6 @@ def apply_css(dark: bool):
         }
 
 
-        /* Switch */
-        .ws-switch { margin-left: 4px; }
-
-        switch {
-            background: rgba(255,255,255,0.12);
-            border: 1px solid rgba(255,255,255,0.14);
-            border-radius: 999px;
-            padding: 2px;
-            min-width: 46px;
-            min-height: 24px;
-        }
-        switch:checked {
-            background: rgba(233, 84, 32, 0.85);
-            border-color: rgba(233, 84, 32, 0.95);
-        }
-        switch slider {
-            background: #EDEDED;
-            border: 1px solid rgba(0,0,0,0.20);
-            border-radius: 50px;
-            min-width: 30px;
-            min-height: 20px;
-        }
-        switch:disabled { opacity: 0.5; }
-    
-        /* Switch */
-        .ws-switch { margin-left: 4px; }
-
-        switch {
-          background: rgba(0,0,0,0.08);
-          border: 1px solid rgba(0,0,0,0.12);
-          border-radius: 999px;
-          padding: 2px;
-          min-width: 46px;
-          min-height: 24px;
-        }
-        switch:checked {
-          background: rgba(233, 84, 32, 0.92);
-          border-color: rgba(233, 84, 32, 1.0);
-        }
-        switch slider {
-          background: #FFFFFF;
-          border: 1px solid rgba(0,0,0,0.18);
-          border-radius: 50px;
-          min-width: 30px;
-          min-height: 20px;
-        }
-        switch:disabled { opacity: 0.6; }
 
 
         /* Actionbar */
@@ -923,29 +877,6 @@ def apply_css(dark: bool):
             color: #8E2C20;
             border-color: rgba(231, 76, 60, 0.28);
         }
-
-        /* Switch */
-        .ws-switch { margin-left: 4px; }
-        switch {
-            background: rgba(0,0,0,0.08);
-            border: 1px solid rgba(0,0,0,0.12);
-            border-radius: 999px;
-            padding: 2px;
-            min-width: 46px;
-            min-height: 24px;
-        }
-        switch:checked {
-            background: rgba(233, 84, 32, 0.92);
-            border-color: rgba(233, 84, 32, 1.0);
-        }
-        switch slider {
-            background: #FFFFFF;
-            border: 1px solid rgba(0,0,0,0.18);
-            border-radius: 50px;
-            min-width: 30px;
-            min-height: 20px;
-        }
-        switch:disabled { opacity: 0.6; }
 
         /* Actionbar */
         .actionbar {
@@ -2163,6 +2094,8 @@ class App(Gtk.Window):
                 wdir = self.cfg.get("wallpaper_dir", str(Path.home() / "Images" / "wallpaper"))
                 cur = Path(wdir) / "current.png"
                 self.dash_wall.set_text(str(cur) if cur.exists() else "—")
+
+            self._refresh_auto_geoloc_label()
         except Exception as e:
             try:
                 self.dash_meteo.set_text(f"Erreur dashboard: {e}")
@@ -2173,151 +2106,424 @@ class App(Gtk.Window):
 
     
     def build_tab_time(self):
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        grid = Gtk.Grid(column_spacing=10, row_spacing=8)
+            box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            grid = Gtk.Grid(column_spacing=10, row_spacing=8)
 
-        def parse_time_text(txt: str):
-            txt = (txt or "").strip()
-            if not txt:
-                return None, None
-
-            # Accept "H", "HH", "H:MM", "HH:MM"
-            if ":" in txt:
-                parts = txt.split(":")
-                if len(parts) != 2:
+            def parse_time_text(txt: str):
+                txt = (txt or "").strip()
+                if not txt:
                     return None, None
-                try:
-                    h = int(parts[0].strip() or "0")
-                    m = int(parts[1].strip() or "0")
-                except Exception:
-                    return None, None
-            else:
-                try:
-                    h = int(txt)
-                except Exception:
-                    return None, None
-                m = 0
 
-            if h < 0:
-                h = 0
-            if h > 23:
-                h = 23
-            if m < 0:
-                m = 0
-            if m > 59:
-                m = 59
-            return h, m
+                # Accept "H", "HH", "H:MM", "HH:MM"
+                if ":" in txt:
+                    parts = txt.split(":")
+                    if len(parts) != 2:
+                        return None, None
+                    try:
+                        h = int(parts[0].strip() or "0")
+                        m = int(parts[1].strip() or "0")
+                    except Exception:
+                        return None, None
+                else:
+                    try:
+                        h = int(txt)
+                    except Exception:
+                        return None, None
+                    m = 0
 
-        def format_time(h, m) -> str:
-            if h is None or m is None:
-                return ""
-            return f"{int(h):02d}:{int(m):02d}"
-
-        def get_hm(sch: dict, key: str):
-            v = sch.get(key, None)
-
-            if isinstance(v, int):
-                return v, 0
-
-            if isinstance(v, str):
-                h, m = parse_time_text(v)
-                if h is None or m is None:
-                    return 0, 0
+                if h < 0:
+                    h = 0
+                if h > 23:
+                    h = 23
+                if m < 0:
+                    m = 0
+                if m > 59:
+                    m = 59
                 return h, m
 
-            if isinstance(v, dict):
-                h = v.get("h", v.get("hour", 0))
-                m = v.get("m", v.get("minute", 0))
-                try:
-                    return int(h), int(m)
-                except Exception:
-                    return 0, 0
-
-            return 0, 0
-
-        def time_field(initial_h: int, initial_m: int):
-            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-
-            e = Gtk.Entry()
-            e.set_width_chars(5)
-            e.set_max_width_chars(5)
-            e.set_placeholder_text("HH:MM")
-            e.set_alignment(0.5)
-            e.set_text(format_time(initial_h, initial_m))
-            set_hand_cursor_on_hover(e)
-
-            btn = Gtk.Button()
-            btn.set_relief(Gtk.ReliefStyle.NONE)
-            btn.set_focus_on_click(False)
-            btn.set_tooltip_text("Vider")
-
-            btn.get_style_context().add_class("time-clear-btn")
-
-            img = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
-            btn.set_image(img)
-            set_hand_cursor_on_hover(btn)
-
-            def on_clear(_b):
-                e.set_text("")
-
-            btn.connect("clicked", on_clear)
-
-            def on_focus_out(_w, _ev):
-                txt = (e.get_text() or "").strip()
-                if not txt:
-                    return False
-                h, m = parse_time_text(txt)
+            def format_time(h, m) -> str:
                 if h is None or m is None:
+                    return ""
+                return f"{int(h):02d}:{int(m):02d}"
+
+            def get_hm(sch: dict, key: str):
+                v = sch.get(key, None)
+
+                if isinstance(v, int):
+                    return v, 0
+
+                if isinstance(v, str):
+                    h, m = parse_time_text(v)
+                    if h is None or m is None:
+                        return 0, 0
+                    return h, m
+
+                if isinstance(v, dict):
+                    h = v.get("h", v.get("hour", 0))
+                    m = v.get("m", v.get("minute", 0))
+                    try:
+                        return int(h), int(m)
+                    except Exception:
+                        return 0, 0
+
+                return 0, 0
+
+            def time_field(initial_h: int, initial_m: int):
+                row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+                e = Gtk.Entry()
+                e.set_width_chars(5)
+                e.set_max_width_chars(5)
+                e.set_placeholder_text("HH:MM")
+                e.set_alignment(0.5)
+                e.set_text(format_time(initial_h, initial_m))
+                set_hand_cursor_on_hover(e)
+
+                btn = Gtk.Button()
+                btn.set_relief(Gtk.ReliefStyle.NONE)
+                btn.set_focus_on_click(False)
+                btn.set_tooltip_text("Vider")
+                btn.get_style_context().add_class("time-clear-btn")
+
+                img = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
+                btn.set_image(img)
+                set_hand_cursor_on_hover(btn)
+
+                def on_clear(_b):
                     e.set_text("")
+
+                btn.connect("clicked", on_clear)
+
+                def on_focus_out(_w, _ev):
+                    txt = (e.get_text() or "").strip()
+                    if not txt:
+                        return False
+                    h, m = parse_time_text(txt)
+                    if h is None or m is None:
+                        e.set_text("")
+                        return False
+                    e.set_text(format_time(h, m))
                     return False
-                e.set_text(format_time(h, m))
+
+                e.connect("focus-out-event", on_focus_out)
+
+                row.pack_start(e, False, False, 0)
+                row.pack_start(btn, False, False, 0)
+
+                return row, e
+
+            sch = self.cfg.get("schedule", {})
+
+            h_aube, m_aube = get_hm(sch, "aube_start")
+            h_midi, m_midi = get_hm(sch, "midi_start")
+            h_coucher, m_coucher = get_hm(sch, "coucher_start")
+            h_nuit, m_nuit = get_hm(sch, "nuit_start")
+
+            w_aube, self.entry_aube_time = time_field(h_aube, m_aube)
+            w_midi, self.entry_midi_time = time_field(h_midi, m_midi)
+            w_coucher, self.entry_coucher_time = time_field(h_coucher, m_coucher)
+            w_nuit, self.entry_nuit_time = time_field(h_nuit, m_nuit)
+
+            rows = [
+                (_("tab.schedules.card-shedules.lbl.start-aube"), w_aube),
+                (_("tab.schedules.card-shedules.lbl.start-midi"), w_midi),
+                (_("tab.schedules.card-shedules.lbl.start-coucher"), w_coucher),
+                (_("tab.schedules.card-shedules.lbl.start-night"), w_nuit),
+            ]
+
+            for i, (t, w) in enumerate(rows):
+                grid.attach(Gtk.Label(label=t, xalign=0), 0, i, 1, 1)
+                grid.attach(w, 1, i, 1, 1)
+
+            # -------------------------
+            # Auto schedules card
+            # -------------------------
+            auto_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+            row_auto = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+
+            lbl_auto = Gtk.Label(label=f"Localisation en cours:", xalign=0)
+            lbl_auto.get_style_context().add_class("muted")
+            row_auto.pack_start(lbl_auto, True, True, 0)
+
+            self.switch_auto_schedule = Gtk.Switch()
+            self.switch_auto_schedule.set_active(bool(self.cfg.get("schedule_auto", False)))
+            set_hand_cursor_on_hover(self.switch_auto_schedule)
+            self.switch_auto_schedule.connect("notify::active", self._on_schedule_auto_switch)
+            self.switch_auto_schedule.get_style_context().add_class("ws-switch")
+            row_auto.pack_start(self.switch_auto_schedule, False, False, 0)
+
+            auto_box.pack_start(row_auto, False, False, 0)
+
+            # Geolocation info (city + lat/lon)
+            geo_city = ""
+            geo_lat = ""
+            geo_lon = ""
+
+            try:
+                geo_city = (self.city_entry.get_text() or "").strip()
+            except Exception:
+                pass
+
+            try:
+                geo_lat = (self.lat_entry.get_text() or "").strip()
+                geo_lon = (self.lon_entry.get_text() or "").strip()
+            except Exception:
+                pass
+
+            if not geo_city:
+                geo_city = (self.cfg.get("geolocation", {}) or {}).get("city_name", "—")
+
+            if not geo_lat or not geo_lon:
+                fixed = (self.cfg.get("geolocation", {}) or {}).get("fixed", {})
+                if not geo_lat:
+                    geo_lat = str(fixed.get("lat", "—"))
+                if not geo_lon:
+                    geo_lon = str(fixed.get("lon", "—"))
+
+            self.lbl_auto_geoloc = Gtk.Label(
+                label=f"{geo_city} ({geo_lat}, {geo_lon})",
+                xalign=0,
+            )
+            self.lbl_auto_geoloc.get_style_context().add_class("muted")
+            auto_box.pack_start(self.lbl_auto_geoloc, False, False, 0)
+
+            self._refresh_auto_geoloc_label()
+
+            # Frequency card
+            row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            self.spin_minutes = Gtk.SpinButton.new_with_range(1, 240, 1)
+            self.spin_minutes.set_value(int(self.cfg.get("timer_minutes", 10)))
+            set_hand_cursor_on_hover(self.spin_minutes)
+
+            lbl = Gtk.Label(label=_("tab.schedules.card-frequency.lbl"), xalign=0)
+            lbl.get_style_context().add_class("muted")
+            row2.pack_start(lbl, False, False, 0)
+            row2.pack_start(self.spin_minutes, False, False, 0)
+
+            box.pack_start(make_card(_("tab.schedules.card-shedules.title"), grid), False, False, 0)
+            box.pack_start(make_card("Horaires automatiques", auto_box), False, False, 0)
+            box.pack_start(make_card(_("tab.schedules.card-frequency.title"), row2), False, False, 0)
+
+            return make_page(box)
+
+    def _refresh_auto_geoloc_label(self):
+        # Update the geoloc label shown in the auto schedule card
+        try:
+            if not hasattr(self, "lbl_auto_geoloc"):
+                return None
+
+            geo_city = ""
+            geo_lat = ""
+            geo_lon = ""
+
+            try:
+                geo_city = (self.city_entry.get_text() or "").strip()
+            except Exception:
+                geo_city = ""
+
+            try:
+                geo_lat = (self.lat_entry.get_text() or "").strip()
+                geo_lon = (self.lon_entry.get_text() or "").strip()
+            except Exception:
+                geo_lat = ""
+                geo_lon = ""
+
+            if not geo_city:
+                geo_city = (self.cfg.get("geolocation", {}) or {}).get("city_name", "") or "—"
+
+            if not geo_lat or not geo_lon:
+                fixed = (self.cfg.get("geolocation", {}) or {}).get("fixed", {}) or {}
+                if not geo_lat:
+                    geo_lat = str(fixed.get("lat", "—"))
+                if not geo_lon:
+                    geo_lon = str(fixed.get("lon", "—"))
+
+            self.lbl_auto_geoloc.set_text(f"{geo_city} ({geo_lat}, {geo_lon}) - {self.geo_combo.get_active_text()}")
+            return None
+        except Exception:
+            return None
+
+
+
+    def _on_schedule_auto_switch(self, sw, _pspec):
+        # Step 2: when ON, fetch sunrise/sunset and set aube/coucher entries
+        try:
+            enabled = bool(sw.get_active())
+
+            # Optional: disable manual edit for aube/coucher when ON
+            try:
+                self.entry_aube_time.set_sensitive(not enabled)
+                self.entry_coucher_time.set_sensitive(not enabled)
+            except Exception:
+                pass
+
+            if not enabled:
+                return None
+
+            lat_txt = (self.lat_entry.get_text() or "").strip()
+            lon_txt = (self.lon_entry.get_text() or "").strip()
+
+            try:
+                lat = float(lat_txt)
+                lon = float(lon_txt)
+            except Exception:
+                self.message("Erreur", "Latitude/Longitude invalides")
+                sw.set_active(False)
+                try:
+                    self.entry_aube_time.set_sensitive(True)
+                    self.entry_coucher_time.set_sensitive(True)
+                except Exception:
+                    pass
+                return None
+
+            # Run network call in background thread (do not block GTK main loop)
+            t = threading.Thread(target=self._fetch_and_apply_sun_times, args=(lat, lon, sw), daemon=True)
+            t.start()
+            return None
+        except Exception as e:
+            self.message("Erreur", str(e))
+            return None
+
+
+    def _fetch_and_apply_sun_times(self, lat: float, lon: float, sw):
+        # Background thread: fetch sunrise/sunset then update UI via GLib.idle_add
+        try:
+            from gi.repository import GLib
+
+            # Open-Meteo: need 2 days to compute "nuit" midpoint using tomorrow sunrise
+            url = (
+                "https://api.open-meteo.com/v1/forecast"
+                f"?latitude={lat}"
+                f"&longitude={lon}"
+                "&daily=sunrise,sunset"
+                "&forecast_days=2"
+                "&timezone=Europe%2FParis"
+            )
+
+            req = urllib.request.Request(url, headers={"User-Agent": "wallpaper-smart-ui"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                raw = r.read().decode("utf-8", errors="replace")
+
+            data = json.loads(raw)
+
+            daily = data.get("daily", {}) or {}
+            sunrise_list = daily.get("sunrise", []) or []
+            sunset_list = daily.get("sunset", []) or []
+
+            if len(sunrise_list) < 2 or len(sunset_list) < 1:
+                raise Exception("Aucune donnee sunrise/sunset suffisante retournee par l API")
+
+            sunrise_today_iso = str(sunrise_list[0])
+            sunset_today_iso = str(sunset_list[0])
+            sunrise_tomorrow_iso = str(sunrise_list[1])
+
+            def _hhmm_from_iso(iso_str: str) -> str:
+                if "T" in iso_str:
+                    t = iso_str.split("T", 1)[1]
+                else:
+                    t = iso_str
+                parts = t.split(":")
+                if len(parts) >= 2:
+                    hh = parts[0].zfill(2)
+                    mm = parts[1].zfill(2)
+                    return f"{hh}:{mm}"
+                return ""
+
+            def _minutes_from_hhmm(hhmm: str) -> int:
+                parts = (hhmm or "").split(":")
+                if len(parts) != 2:
+                    return 0
+                h = int(parts[0])
+                m = int(parts[1])
+                if h < 0:
+                    h = 0
+                if h > 23:
+                    h = 23
+                if m < 0:
+                    m = 0
+                if m > 59:
+                    m = 59
+                return h * 60 + m
+
+            def _hhmm_from_minutes(mins: int) -> str:
+                mins = int(mins) % (24 * 60)
+                h = mins // 60
+                m = mins % 60
+                return f"{h:02d}:{m:02d}"
+
+            # Base times
+            aube_hhmm = _hhmm_from_iso(sunrise_today_iso)
+            coucher_hhmm = _hhmm_from_iso(sunset_today_iso)
+            sunrise_tomorrow_hhmm = _hhmm_from_iso(sunrise_tomorrow_iso)
+
+            if not aube_hhmm or not coucher_hhmm or not sunrise_tomorrow_hhmm:
+                raise Exception("Format sunrise/sunset invalide")
+
+            aube_min = _minutes_from_hhmm(aube_hhmm)
+            coucher_min = _minutes_from_hhmm(coucher_hhmm)
+            sunrise_tomorrow_min = _minutes_from_hhmm(sunrise_tomorrow_hhmm)
+
+            # Option A:
+            # midi = midpoint between sunrise and sunset (today)
+            # nuit = midpoint between sunset (today) and sunrise (tomorrow) across midnight
+            day_len = coucher_min - aube_min
+            if day_len <= 0:
+                raise Exception("Horaires incoherents (sunset <= sunrise)")
+
+            midi_min = aube_min + (day_len // 2)
+
+            night_len = (24 * 60 - coucher_min) + sunrise_tomorrow_min
+            if night_len <= 0:
+                raise Exception("Horaires incoherents (night length)")
+
+            nuit_min = (coucher_min + (night_len // 2)) % (24 * 60)
+
+            midi_hhmm = _hhmm_from_minutes(midi_min)
+            nuit_hhmm = _hhmm_from_minutes(nuit_min)
+
+            def _apply():
+                try:
+                    # Fill entries
+                    self.entry_aube_time.set_text(aube_hhmm)
+                    self.entry_midi_time.set_text(midi_hhmm)
+                    self.entry_coucher_time.set_text(coucher_hhmm)
+                    self.entry_nuit_time.set_text(nuit_hhmm)
+
+                    sw.set_active(True)
+
+                    # Optional feedback
+                    self.message(
+                        "OK",
+                        f"Aube: {aube_hhmm}  Midi: {midi_hhmm}  Coucher: {coucher_hhmm}  Nuit: {nuit_hhmm}",
+                    )
+                except Exception as e:
+                    self.message("Erreur", str(e))
                 return False
 
-            e.connect("focus-out-event", on_focus_out)
+            GLib.idle_add(_apply)
+        except Exception as e:
+            try:
+                from gi.repository import GLib
 
-            row.pack_start(e, False, False, 0)
-            row.pack_start(btn, False, False, 0)
+                def _fail():
+                    self.message("Erreur", f"Impossible de recuperer horaires auto: {e}")
+                    try:
+                        sw.set_active(False)
+                        self.entry_aube_time.set_sensitive(True)
+                        self.entry_coucher_time.set_sensitive(True)
+                        self.entry_midi_time.set_sensitive(True)
+                        self.entry_nuit_time.set_sensitive(True)
+                    except Exception:
+                        pass
+                    return False
 
-            return row, e
-
-        sch = self.cfg.get("schedule", {})
-
-        h_aube, m_aube = get_hm(sch, "aube_start")
-        h_midi, m_midi = get_hm(sch, "midi_start")
-        h_coucher, m_coucher = get_hm(sch, "coucher_start")
-        h_nuit, m_nuit = get_hm(sch, "nuit_start")
-
-        w_aube, self.entry_aube_time = time_field(h_aube, m_aube)
-        w_midi, self.entry_midi_time = time_field(h_midi, m_midi)
-        w_coucher, self.entry_coucher_time = time_field(h_coucher, m_coucher)
-        w_nuit, self.entry_nuit_time = time_field(h_nuit, m_nuit)
-
-        rows = [
-            (_("tab.schedules.card-shedules.lbl.start-aube"), w_aube),
-            (_("tab.schedules.card-shedules.lbl.start-midi"), w_midi),
-            (_("tab.schedules.card-shedules.lbl.start-coucher"), w_coucher),
-            (_("tab.schedules.card-shedules.lbl.start-night"), w_nuit),
-        ]
-
-        for i, (t, w) in enumerate(rows):
-            grid.attach(Gtk.Label(label=t, xalign=0), 0, i, 1, 1)
-            grid.attach(w, 1, i, 1, 1)
-
-        row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.spin_minutes = Gtk.SpinButton.new_with_range(1, 240, 1)
-        self.spin_minutes.set_value(int(self.cfg.get("timer_minutes", 10)))
-        set_hand_cursor_on_hover(self.spin_minutes)
-
-        lbl = Gtk.Label(label=_("tab.schedules.card-frequency.lbl"), xalign=0)
-        lbl.get_style_context().add_class("muted")
-        row2.pack_start(lbl, False, False, 0)
-        row2.pack_start(self.spin_minutes, False, False, 0)
-
-        box.pack_start(make_card(_("tab.schedules.card-shedules.title"), grid), False, False, 0)
-        box.pack_start(make_card(_("tab.schedules.card-frequency.title"), row2), False, False, 0)
-
-        return make_page(box)
-
+                GLib.idle_add(_fail)
+            except Exception:
+                try:
+                    self.message("Erreur", str(e))
+                except Exception:
+                    pass
 
 
 
@@ -2425,6 +2631,14 @@ class App(Gtk.Window):
         self.lon_entry.set_text(str(fixed.get("lon", 7.7455)))
         self.city_entry = Gtk.Entry()
         self.city_entry.set_text(self.cfg.get("geolocation", {}).get("city_name", "Strasbourg"))
+
+        try:
+            self.city_entry.connect("changed", lambda *_: self._refresh_auto_geoloc_label())
+            self.lat_entry.connect("changed", lambda *_: self._refresh_auto_geoloc_label())
+            self.lon_entry.connect("changed", lambda *_: self._refresh_auto_geoloc_label())
+        except Exception:
+            pass
+
 
         g = Gtk.Grid(column_spacing=10, row_spacing=8)
         g.attach(Gtk.Label(label=_("tab.location.card-geoloc.lbl-lat"), xalign=0), 0, 0, 1, 1)
@@ -3135,7 +3349,7 @@ class App(Gtk.Window):
             active_lbl = Gtk.Label(label=_("tab.setting.dashboard-card.state-on"))
             active_lbl.get_style_context().add_class("muted")
             header.pack_start(active_lbl, False, False, 0)
-
+            
             active_sw = Gtk.Switch()
             active_sw.set_active(True)
             active_sw.get_style_context().add_class("ws-switch")
@@ -3839,6 +4053,12 @@ class App(Gtk.Window):
             cfg["wallpaper_theme"] = theme_id
 
             cfg["timer_minutes"] = int(self.spin_minutes.get_value())
+
+            # Schedule auto switch
+            if hasattr(self, "switch_auto_schedule"):
+                cfg["schedule_auto"] = bool(self.switch_auto_schedule.get_active())
+            else:
+                cfg["schedule_auto"] = bool(cfg.get("schedule_auto", False))
 
             # --- Schedule (HH:MM) ---
             old_sch = cfg.get("schedule", {}) or {}
