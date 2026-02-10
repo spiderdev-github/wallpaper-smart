@@ -17,6 +17,7 @@
 [ ] themes meteo panel : change switch btn css
 [ ] themes meteo panel : add active label (if current)
 [ ] Shedule tab : if change value disable auto schedule !!!
+[ ] Fix: meteo panel, disable/enable wallpaper
 
 
  
