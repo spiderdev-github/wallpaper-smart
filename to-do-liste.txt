@@ -18,6 +18,5 @@
 [ ] themes meteo panel : add active label (if current)
 [ ] Shedule tab : if change value disable auto schedule !!!
 [ ] Fix: meteo panel, disable/enable wallpaper
-
-
- 
+[ ] dashboard add shedules info
+[ ] add tab settings (langue / wallpaper dir)
