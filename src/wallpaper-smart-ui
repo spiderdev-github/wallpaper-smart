@@ -2301,8 +2301,8 @@ class App(Gtk.Window):
             row2.pack_start(lbl, False, False, 0)
             row2.pack_start(self.spin_minutes, False, False, 0)
 
-            box.pack_start(make_card(_("tab.schedules.card-shedules.title"), grid), False, False, 0)
             box.pack_start(make_card("Horaires automatiques", auto_box), False, False, 0)
+            box.pack_start(make_card(_("tab.schedules.card-shedules.title"), grid), False, False, 0)
             box.pack_start(make_card(_("tab.schedules.card-frequency.title"), row2), False, False, 0)
 
             return make_page(box)
