@@ -1,12 +1,21 @@
-[ ] themes : add lang management for name of theme in theme.json
 [x] remove wallpaper folder from dashboard to theme tab
 [x] Times: add minute management
 [x] Remove click event on meteo row pannel
-[ ] create crontab, if not systemd install it
-[ ] Times: change frequence => if has systemd update service else crontab
 [x] switch light/dark 
 [x] remove refresh_preview where on_save (or/and reduce size of wallpaper)
 [x] auto load schedules
-[ ] disable delete schedule if auto load
 [x] when change location reload shedules if auto load is on
-[ ] onload if auto schedule disable time inputs
+[ ] themes : add lang management for name of theme in theme.json
+[ ] install : create crontab, if not systemd install it
+[ ] Times: change frequence => if has systemd update service else crontab
+[ ] * disable delete btn schedule if auto load
+[ ] * onload if auto schedule disable time inputs
+[ ] change localisation tab, make two bloc (choose and lat/lon/city)
+[ ] location tab : change style of btn empty city
+[ ] schedule tab : add lang var for auto shedules 
+[ ] general : update all lang files
+[ ] themes meteo panel : change switch btn css
+[ ] themes meteo panel : add active label (if current)
+
+
+ 
