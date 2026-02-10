@@ -758,6 +758,28 @@ def apply_css(dark: bool):
         background: rgba(255, 159, 58, 0.08);
         }
 
+        button.time-clear-btn,
+        button.time-clear-btn:hover,
+        button.time-clear-btn:active,
+        button.time-clear-btn:checked,
+        button.time-clear-btn:focus {
+            padding: 0 10px;
+            min-width: 28px;
+            min-height: 28px;
+
+            border-radius: 12px;
+            box-shadow: none;
+            background-clip: padding-box;
+        }
+
+
+        button.time-clear-btn:hover {
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+
+        button.time-clear-btn:hover {
+            background-color: rgba(255, 80, 80, 0.18);
+        }
 
         """
     else:
@@ -1573,7 +1595,7 @@ class App(Gtk.Window):
     
     def _rel_image_path(self, kind: str, filename: str) -> str:
         return f"{kind}/{filename}"
-    
+        
     # ------- Tabs -------
     def build_tab_general(self):
         # Dashboard + dossier
@@ -1591,37 +1613,6 @@ class App(Gtk.Window):
         self.language_card = self.build_language_card()
         page.pack_start(self.language_card, False, False, 0)
         
-        # --- Dossier wallpapers ---
-        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-
-        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        self.folder_entry = Gtk.Entry()
-        self.folder_entry.set_text(self.cfg["wallpaper_dir"])
-        self.folder_entry.set_sensitive(False)
-
-        btn_choose = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-choose"))
-        btn_choose.connect("clicked", self.on_choose_folder)
-        set_hand_cursor_on_hover(btn_choose)
-
-        btn_open = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-open"))
-        btn_open.connect("clicked", self.on_open_folder)
-        set_hand_cursor_on_hover(btn_open)
-
-        row.pack_start(self.folder_entry, True, True, 0)
-        row.pack_start(btn_choose, False, False, 0)
-        row.pack_start(btn_open, False, False, 0)
-
-        help_lbl = Gtk.Label(
-            label=_("tab.setting.wallpaper-card.lbl-wallpaper"),
-            xalign=0
-        )
-        help_lbl.set_line_wrap(True)
-        help_lbl.get_style_context().add_class("muted")
-
-        content.pack_start(row, False, False, 0)
-        content.pack_start(help_lbl, False, False, 0)
-
-        page.pack_start(make_card(_("tab.setting.wallpaper-card.title"), content), False, False, 0)
 
         # Refresh dashboard once UI is built
         # self.refresh_dashboard()
@@ -1906,35 +1897,115 @@ class App(Gtk.Window):
         ctx.add_class("chip-ok" if ok else "chip-miss")
         w.set_text(text)
 
+    #--- refreshdashboard_start
     def refresh_dashboard(self):
         """Update dashboard values from config + last service logs."""
         try:
             # Timer status
             active = is_timer_active()
-            self._set_chip(self.dash_timer, active, _("tab.setting.dashboard-card.state-on") if active else _("tab.setting.dashboard-card.state-off"))
+            self._set_chip(
+                self.dash_timer,
+                active,
+                _("tab.setting.dashboard-card.state-on") if active else _("tab.setting.dashboard-card.state-off"),
+            )
 
-            # Moment (from schedule)
             import datetime
             now = datetime.datetime.now()
-            hour = now.hour
-            sch = self.cfg.get("schedule", {})
-            nuit = int(sch.get("nuit_start", 19))
-            aube = int(sch.get("aube_start", 5))
-            midi = int(sch.get("midi_start", 11))
-            coucher = int(sch.get("coucher_start", 17))
+            now_min = now.hour * 60 + now.minute
+
+            def _parse_time_text(txt: str):
+                txt = (txt or "").strip()
+                if not txt:
+                    return None, None
+
+                if ":" in txt:
+                    parts = txt.split(":")
+                    if len(parts) != 2:
+                        return None, None
+                    try:
+                        h = int(parts[0].strip() or "0")
+                        m = int(parts[1].strip() or "0")
+                    except Exception:
+                        return None, None
+                else:
+                    try:
+                        h = int(txt)
+                    except Exception:
+                        return None, None
+                    m = 0
+
+                if h < 0:
+                    h = 0
+                if h > 23:
+                    h = 23
+                if m < 0:
+                    m = 0
+                if m > 59:
+                    m = 59
+
+                return h, m
+
+            def _get_hm(schedule, key, default_h, default_m):
+                v = schedule.get(key, None)
+
+                if isinstance(v, int):
+                    return int(v), 0
+
+                if isinstance(v, str):
+                    h, m = _parse_time_text(v)
+                    if h is None or m is None:
+                        return default_h, default_m
+                    return h, m
+
+                if isinstance(v, dict):
+                    try:
+                        h = int(v.get("h", v.get("hour", default_h)))
+                        m = int(v.get("m", v.get("minute", default_m)))
+                        if h < 0:
+                            h = 0
+                        if h > 23:
+                            h = 23
+                        if m < 0:
+                            m = 0
+                        if m > 59:
+                            m = 59
+                        return h, m
+                    except Exception:
+                        return default_h, default_m
+
+                return default_h, default_m
+
+            def _to_min(h, m):
+                return int(h) * 60 + int(m)
+
+            def _in_range(t, start, end):
+                # True if t in [start, end) on a circular day clock
+                if start <= end:
+                    return start <= t < end
+                return t >= start or t < end
+
+            # Moment (from schedule)
+            sch = self.cfg.get("schedule", {}) or {}
+
+            aube_h, aube_m = _get_hm(sch, "aube_start", 5, 0)
+            midi_h, midi_m = _get_hm(sch, "midi_start", 11, 0)
+            coucher_h, coucher_m = _get_hm(sch, "coucher_start", 17, 0)
+            nuit_h, nuit_m = _get_hm(sch, "nuit_start", 19, 0)
+
+            aube_t = _to_min(aube_h, aube_m)
+            midi_t = _to_min(midi_h, midi_m)
+            coucher_t = _to_min(coucher_h, coucher_m)
+            nuit_t = _to_min(nuit_h, nuit_m)
 
             moment = "nuit"
-            if aube <= hour < midi:
+            if _in_range(now_min, aube_t, midi_t):
                 moment = "aube"
-            elif midi <= hour < coucher:
+            elif _in_range(now_min, midi_t, coucher_t):
                 moment = "midi"
+            elif _in_range(now_min, coucher_t, nuit_t):
+                moment = "coucher"
             else:
-                # coucher window depends on nuit start
-                if coucher < nuit:
-                    moment = "coucher" if coucher <= hour < nuit else "nuit"
-                else:
-                    moment = "coucher" if (hour >= coucher or hour < nuit) else "nuit"
-            
+                moment = "nuit"
 
             moment_txt = MOMENT_LABELS.get(moment, moment)
             self.dash_moment.set_text(f"{moment_txt} - {now.strftime('%Hh%M')}")
@@ -1942,16 +2013,14 @@ class App(Gtk.Window):
             # Geoloc summary
             geo = self.cfg.get("geolocation", {})
             mode = geo.get("mode", "auto_ip")
-            preset = geo.get("preset", "none")
             fixed = geo.get("fixed", {})
             city = geo.get("city_name", "")
-            
+
             it = None
             try:
                 it = self.preset_combo.get_active_iter()
             except Exception:
                 it = None
-
 
             if it is None:
                 preset_id = "none"
@@ -1966,33 +2035,60 @@ class App(Gtk.Window):
                 lat = float(self.preset_store[it][3])
                 lon = float(self.preset_store[it][4])
                 label = str(self.preset_store[it][1])
-                
+
             if mode == "preset":
-                self.dash_loc.set_text(f"{_("Preset")}: {label} ({lat:.4f}, {lon:.4f})")
+                self.dash_loc.set_text(f"{_('Preset')}: {label} ({lat:.4f}, {lon:.4f})")
             elif mode == "fixed":
-                self.dash_loc.set_text(f"{_("Manuel")}: {fixed.get('lat', '—')}, {fixed.get('lon', '—')} - {city}")
+                self.dash_loc.set_text(f"{_('Manuel')}: {fixed.get('lat', '—')}, {fixed.get('lon', '—')} - {city}")
             elif mode == "city":
-                self.dash_loc.set_text(f"{_("Ville")}: {city}")
+                self.dash_loc.set_text(f"{_('Ville')}: {city}")
             else:
-                self.dash_loc.set_text(f"{_("Auto")}: {city} - {fixed.get('lat', '—')}, {fixed.get('lon', '—')} ")
-            # Weather + last applied wallpaper from journalctl (best effort)
-            #p = run(["journalctl", "--user", "-u", SERVICE, "-n", "80", "--no-pager"])
-            #logs = p.stdout.splitlines()
+                self.dash_loc.set_text(f"{_('Auto')}: {city} - {fixed.get('lat', '—')}, {fixed.get('lon', '—')} ")
 
+            # Weather + last applied wallpaper (best effort)
+            logs = []
             try:
-                # 1) Construire une config temporaire depuis l'UI (sans sauvegarder la vraie)
-                cfg = json.loads(json.dumps(self.cfg))  # copie safe
+                def _read_time_entry(entry, fallback_h, fallback_m):
+                    txt = (entry.get_text() or "").strip()
+                    if not txt:
+                        return fallback_h, fallback_m
+                    h, m = _parse_time_text(txt)
+                    if h is None or m is None:
+                        return fallback_h, fallback_m
+                    return h, m
 
-                # Wallpaper dir
+                def _format_hm(h, m):
+                    return f"{int(h):02d}:{int(m):02d}"
+
+                # 1) Build temp config from UI
+                cfg = json.loads(json.dumps(self.cfg))
+
                 if hasattr(self, "folder_entry"):
                     cfg["wallpaper_dir"] = self.folder_entry.get_text().strip()
 
-                # Timer
                 if hasattr(self, "spin_minutes"):
                     cfg["timer_minutes"] = int(self.spin_minutes.get_value())
 
-                # Schedule
-                if hasattr(self, "spin_nuit"):
+                old_sch = cfg.get("schedule", {}) or {}
+                aube_h0, aube_m0 = _get_hm(old_sch, "aube_start", 5, 0)
+                midi_h0, midi_m0 = _get_hm(old_sch, "midi_start", 11, 0)
+                coucher_h0, coucher_m0 = _get_hm(old_sch, "coucher_start", 16, 0)
+                nuit_h0, nuit_m0 = _get_hm(old_sch, "nuit_start", 19, 0)
+
+                if hasattr(self, "entry_aube_time"):
+                    aube_h1, aube_m1 = _read_time_entry(self.entry_aube_time, aube_h0, aube_m0)
+                    midi_h1, midi_m1 = _read_time_entry(self.entry_midi_time, midi_h0, midi_m0)
+                    coucher_h1, coucher_m1 = _read_time_entry(self.entry_coucher_time, coucher_h0, coucher_m0)
+                    nuit_h1, nuit_m1 = _read_time_entry(self.entry_nuit_time, nuit_h0, nuit_m0)
+
+                    cfg["schedule"] = {
+                        "aube_start": _format_hm(aube_h1, aube_m1),
+                        "midi_start": _format_hm(midi_h1, midi_m1),
+                        "coucher_start": _format_hm(coucher_h1, coucher_m1),
+                        "nuit_start": _format_hm(nuit_h1, nuit_m1),
+                    }
+                elif hasattr(self, "spin_nuit"):
+                    # Legacy fallback
                     cfg["schedule"] = {
                         "nuit_start": int(self.spin_nuit.get_value()),
                         "aube_start": int(self.spin_aube.get_value()),
@@ -2000,7 +2096,6 @@ class App(Gtk.Window):
                         "coucher_start": int(self.spin_coucher.get_value()),
                     }
 
-                # Geoloc (mode + lat/lon + city + preset)
                 cfg.setdefault("geolocation", {})
                 if hasattr(self, "geo_combo"):
                     cfg["geolocation"]["mode"] = self.geo_combo.get_active_id()
@@ -2017,25 +2112,22 @@ class App(Gtk.Window):
                     cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
 
                 if hasattr(self, "preset_combo"):
-                    # value stored in combo id
-                    preset_id = self.preset_combo.get_active_id() or "none"
-                    cfg["geolocation"]["preset"] = preset_id
+                    preset_id2 = self.preset_combo.get_active_id() or "none"
+                    cfg["geolocation"]["preset"] = preset_id2
 
-                # Mapping
                 if hasattr(self, "map_entries"):
                     cfg.setdefault("weather_mapping", {})
                     for k, e in self.map_entries.items():
                         cfg["weather_mapping"][k] = e.get_text().strip()
 
-                # enabled_images
                 cfg.setdefault("enabled_images", self.cfg.get("enabled_images", {}))
 
-                # 2) Ecrire config temporaire
+                # 2) Write temp config
                 tmp = APP_DIR / "config.test.json"
                 with open(tmp, "w", encoding="utf-8") as f:
                     json.dump(cfg, f, indent=2, ensure_ascii=False)
 
-                # 3) Lancer wallpaper-smart.sh avec la config temporaire
+                # 3) Run script with temp config
                 script = Path.home() / ".local/bin/wallpaper-smart.sh"
                 p = subprocess.run(
                     [str(script)],
@@ -2064,45 +2156,149 @@ class App(Gtk.Window):
                 self.weather_value = prettify_meteo_value_log(meta_line)
             else:
                 self.dash_meteo.set_text("—")
-            print("Meta line: %s" % meta_line)
 
             if wall_line:
                 self.dash_wall.set_text(prettify_wallpaper_log(wall_line))
             else:
-                # fallback: current.png path
                 wdir = self.cfg.get("wallpaper_dir", str(Path.home() / "Images" / "wallpaper"))
                 cur = Path(wdir) / "current.png"
                 self.dash_wall.set_text(str(cur) if cur.exists() else "—")
         except Exception as e:
-            # Don't crash the UI for dashboard refresh
             try:
                 self.dash_meteo.set_text(f"Erreur dashboard: {e}")
             except Exception:
                 pass
 
+    #--- _eof
+
+    
     def build_tab_time(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-
         grid = Gtk.Grid(column_spacing=10, row_spacing=8)
 
-        def spin(value):
-            s = Gtk.SpinButton.new_with_range(0, 23, 1)
-            s.set_value(int(value))
-            set_hand_cursor_on_hover(s)
-            return s
+        def parse_time_text(txt: str):
+            txt = (txt or "").strip()
+            if not txt:
+                return None, None
 
-        sch = self.cfg["schedule"]
-        self.spin_nuit = spin(sch["nuit_start"])
-        self.spin_aube = spin(sch["aube_start"])
-        self.spin_midi = spin(sch["midi_start"])
-        self.spin_coucher = spin(sch["coucher_start"])
+            # Accept "H", "HH", "H:MM", "HH:MM"
+            if ":" in txt:
+                parts = txt.split(":")
+                if len(parts) != 2:
+                    return None, None
+                try:
+                    h = int(parts[0].strip() or "0")
+                    m = int(parts[1].strip() or "0")
+                except Exception:
+                    return None, None
+            else:
+                try:
+                    h = int(txt)
+                except Exception:
+                    return None, None
+                m = 0
+
+            if h < 0:
+                h = 0
+            if h > 23:
+                h = 23
+            if m < 0:
+                m = 0
+            if m > 59:
+                m = 59
+            return h, m
+
+        def format_time(h, m) -> str:
+            if h is None or m is None:
+                return ""
+            return f"{int(h):02d}:{int(m):02d}"
+
+        def get_hm(sch: dict, key: str):
+            v = sch.get(key, None)
+
+            if isinstance(v, int):
+                return v, 0
+
+            if isinstance(v, str):
+                h, m = parse_time_text(v)
+                if h is None or m is None:
+                    return 0, 0
+                return h, m
+
+            if isinstance(v, dict):
+                h = v.get("h", v.get("hour", 0))
+                m = v.get("m", v.get("minute", 0))
+                try:
+                    return int(h), int(m)
+                except Exception:
+                    return 0, 0
+
+            return 0, 0
+
+        def time_field(initial_h: int, initial_m: int):
+            row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+            e = Gtk.Entry()
+            e.set_width_chars(5)
+            e.set_max_width_chars(5)
+            e.set_placeholder_text("HH:MM")
+            e.set_alignment(0.5)
+            e.set_text(format_time(initial_h, initial_m))
+            set_hand_cursor_on_hover(e)
+
+            btn = Gtk.Button()
+            btn.set_relief(Gtk.ReliefStyle.NONE)
+            btn.set_focus_on_click(False)
+            btn.set_tooltip_text("Vider")
+
+            btn.get_style_context().add_class("time-clear-btn")
+
+            img = Gtk.Image.new_from_icon_name("window-close-symbolic", Gtk.IconSize.BUTTON)
+            btn.set_image(img)
+            set_hand_cursor_on_hover(btn)
+
+            def on_clear(_b):
+                e.set_text("")
+
+            btn.connect("clicked", on_clear)
+
+            def on_focus_out(_w, _ev):
+                txt = (e.get_text() or "").strip()
+                if not txt:
+                    return False
+                h, m = parse_time_text(txt)
+                if h is None or m is None:
+                    e.set_text("")
+                    return False
+                e.set_text(format_time(h, m))
+                return False
+
+            e.connect("focus-out-event", on_focus_out)
+
+            row.pack_start(e, False, False, 0)
+            row.pack_start(btn, False, False, 0)
+
+            return row, e
+
+        sch = self.cfg.get("schedule", {})
+
+        h_aube, m_aube = get_hm(sch, "aube_start")
+        h_midi, m_midi = get_hm(sch, "midi_start")
+        h_coucher, m_coucher = get_hm(sch, "coucher_start")
+        h_nuit, m_nuit = get_hm(sch, "nuit_start")
+
+        w_aube, self.entry_aube_time = time_field(h_aube, m_aube)
+        w_midi, self.entry_midi_time = time_field(h_midi, m_midi)
+        w_coucher, self.entry_coucher_time = time_field(h_coucher, m_coucher)
+        w_nuit, self.entry_nuit_time = time_field(h_nuit, m_nuit)
 
         rows = [
-            (_("tab.schedules.card-shedules.lbl.start-aube"), self.spin_aube),
-            (_("tab.schedules.card-shedules.lbl.start-midi"), self.spin_midi),
-            (_("tab.schedules.card-shedules.lbl.start-coucher"), self.spin_coucher),
-            (_("tab.schedules.card-shedules.lbl.start-night"), self.spin_nuit)
+            (_("tab.schedules.card-shedules.lbl.start-aube"), w_aube),
+            (_("tab.schedules.card-shedules.lbl.start-midi"), w_midi),
+            (_("tab.schedules.card-shedules.lbl.start-coucher"), w_coucher),
+            (_("tab.schedules.card-shedules.lbl.start-night"), w_nuit),
         ]
+
         for i, (t, w) in enumerate(rows):
             grid.attach(Gtk.Label(label=t, xalign=0), 0, i, 1, 1)
             grid.attach(w, 1, i, 1, 1)
@@ -2110,16 +2306,20 @@ class App(Gtk.Window):
         row2 = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.spin_minutes = Gtk.SpinButton.new_with_range(1, 240, 1)
         self.spin_minutes.set_value(int(self.cfg.get("timer_minutes", 10)))
+        set_hand_cursor_on_hover(self.spin_minutes)
 
         lbl = Gtk.Label(label=_("tab.schedules.card-frequency.lbl"), xalign=0)
         lbl.get_style_context().add_class("muted")
         row2.pack_start(lbl, False, False, 0)
         row2.pack_start(self.spin_minutes, False, False, 0)
-        set_hand_cursor_on_hover(self.spin_minutes)
+
         box.pack_start(make_card(_("tab.schedules.card-shedules.title"), grid), False, False, 0)
         box.pack_start(make_card(_("tab.schedules.card-frequency.title"), row2), False, False, 0)
 
         return make_page(box)
+
+
+
 
     def build_tab_geoloc(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -2343,6 +2543,38 @@ class App(Gtk.Window):
         paned.pack2(meteo_panel, resize=True, shrink=False)
 
 
+        # --- Dossier wallpapers ---
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.folder_entry = Gtk.Entry()
+        self.folder_entry.set_text(self.cfg["wallpaper_dir"])
+        self.folder_entry.set_sensitive(False)
+
+        btn_choose = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-choose"))
+        btn_choose.connect("clicked", self.on_choose_folder)
+        set_hand_cursor_on_hover(btn_choose)
+
+        btn_open = Gtk.Button(label=_("tab.setting.wallpaper-card.btn-open"))
+        btn_open.connect("clicked", self.on_open_folder)
+        set_hand_cursor_on_hover(btn_open)
+
+        row.pack_start(self.folder_entry, True, True, 0)
+        row.pack_start(btn_choose, False, False, 0)
+        row.pack_start(btn_open, False, False, 0)
+
+        help_lbl = Gtk.Label(
+            label=_("tab.setting.wallpaper-card.lbl-wallpaper"),
+            xalign=0
+        )
+        help_lbl.set_line_wrap(True)
+        help_lbl.get_style_context().add_class("muted")
+
+        content.pack_start(row, False, False, 0)
+        content.pack_start(help_lbl, False, False, 0)
+
+        page.pack_start(make_card(_("tab.setting.wallpaper-card.title"), content), False, False, 0)
+        
         # Actions : refresh preview, open base folder, open meteo folder, create placeholders
         # btn_refresh = Gtk.Button(label=_("tab.images.card-action.btn-refresh"))
         # btn_refresh.connect("clicked", lambda _b: self.refresh_images_preview())
@@ -2374,7 +2606,7 @@ class App(Gtk.Window):
         # # add top to main card
         page.pack_start(make_card(_("tab.images.card-action.title"), top), False, False, 0)
 
-
+        
         
         # Refresh previews + default selection = moment courant
         try:
@@ -2600,31 +2832,102 @@ class App(Gtk.Window):
 
 
     def _compute_current_moment_key(self) -> str:
-        """Return current moment according to schedule and current hour."""
+        """current moment according to schedule and current time (HH:MM)."""
         from datetime import datetime
-        hour = datetime.now().hour
-        sch = self.cfg.get("schedule", {})
-        nuit = int(sch.get("nuit_start", 19))
-        aube = int(sch.get("aube_start", 5))
-        midi = int(sch.get("midi_start", 11))
-        coucher = int(sch.get("coucher_start", 17))
 
-        # Simple windows: [aube, midi), [midi, coucher), [coucher, nuit), else nuit
-        if aube <= hour < midi:
+        now = datetime.now()
+        now_min = now.hour * 60 + now.minute
+        sch = self.cfg.get("schedule", {}) or {}
+
+        def _parse_time_text(txt: str):
+            txt = (txt or "").strip()
+            if not txt:
+                return None, None
+
+            if ":" in txt:
+                parts = txt.split(":")
+                if len(parts) != 2:
+                    return None, None
+                try:
+                    h = int(parts[0].strip() or "0")
+                    m = int(parts[1].strip() or "0")
+                except Exception:
+                    return None, None
+            else:
+                try:
+                    h = int(txt)
+                except Exception:
+                    return None, None
+                m = 0
+
+            if h < 0:
+                h = 0
+            if h > 23:
+                h = 23
+            if m < 0:
+                m = 0
+            if m > 59:
+                m = 59
+
+            return h, m
+
+        def _get_hm(schedule, key, default_h, default_m):
+            v = schedule.get(key, None)
+
+            if isinstance(v, int):
+                return int(v), 0
+
+            if isinstance(v, str):
+                h, m = _parse_time_text(v)
+                if h is None or m is None:
+                    return default_h, default_m
+                return h, m
+
+            if isinstance(v, dict):
+                try:
+                    h = int(v.get("h", v.get("hour", default_h)))
+                    m = int(v.get("m", v.get("minute", default_m)))
+                    if h < 0:
+                        h = 0
+                    if h > 23:
+                        h = 23
+                    if m < 0:
+                        m = 0
+                    if m > 59:
+                        m = 59
+                    return h, m
+                except Exception:
+                    return default_h, default_m
+
+            return default_h, default_m
+
+        def _to_min(h, m):
+            return int(h) * 60 + int(m)
+
+        def _in_range(t, start, end):
+            # True if t in [start, end) on a circular day clock
+            if start <= end:
+                return start <= t < end
+            return t >= start or t < end
+
+        aube_h, aube_m = _get_hm(sch, "aube_start", 5, 0)
+        midi_h, midi_m = _get_hm(sch, "midi_start", 11, 0)
+        coucher_h, coucher_m = _get_hm(sch, "coucher_start", 17, 0)
+        nuit_h, nuit_m = _get_hm(sch, "nuit_start", 19, 0)
+
+        aube_t = _to_min(aube_h, aube_m)
+        midi_t = _to_min(midi_h, midi_m)
+        coucher_t = _to_min(coucher_h, coucher_m)
+        nuit_t = _to_min(nuit_h, nuit_m)
+
+        if _in_range(now_min, aube_t, midi_t):
             return "aube"
-        if midi <= hour < coucher:
+        if _in_range(now_min, midi_t, coucher_t):
             return "midi"
+        if _in_range(now_min, coucher_t, nuit_t):
+            return "coucher"
+        return "nuit"
 
-        # Handle coucher/nuit even if schedule is unusual
-        if coucher < nuit:
-            if coucher <= hour < nuit:
-                return "coucher"
-            return "nuit"
-        else:
-            # coucher window wraps midnight
-            if hour >= coucher or hour < nuit:
-                return "coucher"
-            return "nuit"
 
     def _set_meteo_title(self, moment_key: str):
         moment_label = dict(MOMENTS).get(moment_key, moment_key)
@@ -3414,28 +3717,28 @@ class App(Gtk.Window):
                 ctx.add_class("chip-miss")
 
             # --- Highlight current weather ---
-            row = self.meteo_rows.get(rel)
-            if row:
-                row_ctx = row.get_style_context()
-                row_ctx.remove_class("meteo-current")
+            # row = self.meteo_rows.get(rel)
+            # if row:
+            #     row_ctx = row.get_style_context()
+            #     row_ctx.remove_class("meteo-current")
 
-                highlight_key = active_meteo or (self.weather_value and self.weather_value in rel)
-                # print(f"active_meteo: {active_meteo}")
-                # print(f"highlight_key: {highlight_key}")
-                # print(f"weather_value: {self.weather_value}")
-                # print(f"rel: {rel}")
-                # print("-------------------------------------------")
-                if(active_meteo is not None and active_meteo in rel):
-                    row_ctx.add_class("meteo-current")
-                else: 
-                    if self.weather_value and self.weather_value in rel:
-                        row_ctx.add_class("meteo-current")
+            #     highlight_key = active_meteo or (self.weather_value and self.weather_value in rel)
+            #     # print(f"active_meteo: {active_meteo}")
+            #     # print(f"highlight_key: {highlight_key}")
+            #     # print(f"weather_value: {self.weather_value}")
+            #     # print(f"rel: {rel}")
+            #     # print("-------------------------------------------")
+            #     if(active_meteo is not None and active_meteo in rel):
+            #         row_ctx.add_class("meteo-current")
+            #     else: 
+            #         if self.weather_value and self.weather_value in rel:
+            #             row_ctx.add_class("meteo-current")
         
-                #      row_ctx.add_class("meteo-current")
-                # if highlight_key and highlight_key in rel:
-                #     row_ctx.add_class("meteo-current")
-                # else if self.weather_value and self.weather_value in rel:
-                #      row_ctx.add_class("meteo-current")
+            #     #      row_ctx.add_class("meteo-current")
+            #     # if highlight_key and highlight_key in rel:
+            #     #     row_ctx.add_class("meteo-current")
+            #     # else if self.weather_value and self.weather_value in rel:
+            #     #      row_ctx.add_class("meteo-current")
 
 
         # Re-apply filter after refresh
@@ -3456,36 +3759,111 @@ class App(Gtk.Window):
         try:
             cfg = self.cfg
 
+            def _parse_time_entry(entry, fallback_h=0, fallback_m=0):
+                txt = (entry.get_text() or "").strip()
+                if not txt:
+                    return fallback_h, fallback_m
+
+                if ":" in txt:
+                    parts = txt.split(":")
+                    if len(parts) != 2:
+                        return fallback_h, fallback_m
+                    try:
+                        h = int(parts[0].strip() or "0")
+                        m = int(parts[1].strip() or "0")
+                    except Exception:
+                        return fallback_h, fallback_m
+                else:
+                    try:
+                        h = int(txt)
+                    except Exception:
+                        return fallback_h, fallback_m
+                    m = 0
+
+                if h < 0:
+                    h = 0
+                if h > 23:
+                    h = 23
+                if m < 0:
+                    m = 0
+                if m > 59:
+                    m = 59
+
+                return h, m
+
+            def _format_hm(h, m):
+                return f"{int(h):02d}:{int(m):02d}"
+
+            def _get_existing_hm(schedule, key, default_h, default_m):
+                v = schedule.get(key, None)
+
+                if isinstance(v, int):
+                    return int(v), 0
+
+                if isinstance(v, str):
+                    s = v.strip()
+                    if ":" in s:
+                        parts = s.split(":")
+                        if len(parts) == 2:
+                            try:
+                                return int(parts[0]), int(parts[1])
+                            except Exception:
+                                return default_h, default_m
+                    try:
+                        return int(s), 0
+                    except Exception:
+                        return default_h, default_m
+
+                if isinstance(v, dict):
+                    try:
+                        h = int(v.get("h", v.get("hour", default_h)))
+                        m = int(v.get("m", v.get("minute", default_m)))
+                        return h, m
+                    except Exception:
+                        return default_h, default_m
+
+                return default_h, default_m
+
             cfg["wallpaper_dir"] = self.folder_entry.get_text().strip()
+
             # Wallpaper theme
             if hasattr(self, "wall_theme_combo"):
                 theme_id = self.wall_theme_combo.get_active_id() or "default"
             else:
                 theme_id = cfg.get("wallpaper_theme", "default")
-            
+
             themes = load_wallpaper_themes(cfg["wallpaper_dir"])
             valid_ids = [k for k, _ in themes]
             if theme_id not in valid_ids:
                 theme_id = valid_ids[0]
             cfg["wallpaper_theme"] = theme_id
-            # self.img_wall_theme_combo.set_active_id(theme_id)
 
             cfg["timer_minutes"] = int(self.spin_minutes.get_value())
 
+            # --- Schedule (HH:MM) ---
+            old_sch = cfg.get("schedule", {}) or {}
+
+            aube_h0, aube_m0 = _get_existing_hm(old_sch, "aube_start", 5, 0)
+            midi_h0, midi_m0 = _get_existing_hm(old_sch, "midi_start", 11, 0)
+            coucher_h0, coucher_m0 = _get_existing_hm(old_sch, "coucher_start", 16, 0)
+            nuit_h0, nuit_m0 = _get_existing_hm(old_sch, "nuit_start", 19, 0)
+
+            aube_h, aube_m = _parse_time_entry(self.entry_aube_time, aube_h0, aube_m0)
+            midi_h, midi_m = _parse_time_entry(self.entry_midi_time, midi_h0, midi_m0)
+            coucher_h, coucher_m = _parse_time_entry(self.entry_coucher_time, coucher_h0, coucher_m0)
+            nuit_h, nuit_m = _parse_time_entry(self.entry_nuit_time, nuit_h0, nuit_m0)
+
             cfg["schedule"] = {
-                "nuit_start": int(self.spin_nuit.get_value()),
-                "aube_start": int(self.spin_aube.get_value()),
-                "midi_start": int(self.spin_midi.get_value()),
-                "coucher_start": int(self.spin_coucher.get_value()),
+                "aube_start": _format_hm(aube_h, aube_m),
+                "midi_start": _format_hm(midi_h, midi_m),
+                "coucher_start": _format_hm(coucher_h, coucher_m),
+                "nuit_start": _format_hm(nuit_h, nuit_m),
             }
 
             cfg["geolocation"]["mode"] = self.geo_combo.get_active_id()
             cfg["geolocation"]["fixed"]["lat"] = float(self.lat_entry.get_text().strip())
             cfg["geolocation"]["fixed"]["lon"] = float(self.lon_entry.get_text().strip())
             cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
-
-
-            
 
             preset_id = "none"
             it = None
@@ -3521,14 +3899,7 @@ class App(Gtk.Window):
                 cfg["geolocation"]["city_name"] = pretty
                 cfg["geolocation"]["preset"] = preset_id
 
-
-            # self.refresh_geoloc_controls()
-
-
-            
             save_cfg(self.cfg)
-            
-            
 
             for k in WEATHER_KEYS_ORDER:
                 cfg["weather_mapping"][k] = self.map_entries[k].get_text().strip()
@@ -3556,13 +3927,89 @@ class App(Gtk.Window):
             self.message("OK", _("ui.saved-successfully"))
             self.refresh_toggle_label()
             self.refresh_dashboard()
-            self.refresh_images_preview()
+            # self.refresh_images_preview()
         except Exception as e:
             self.message("Erreur", str(e))
+
 
     def on_test(self, _btn):
         try:
             print(" -- on_test --")
+
+            def _parse_time_text(txt: str):
+                txt = (txt or "").strip()
+                if not txt:
+                    return None, None
+
+                if ":" in txt:
+                    parts = txt.split(":")
+                    if len(parts) != 2:
+                        return None, None
+                    try:
+                        h = int(parts[0].strip() or "0")
+                        m = int(parts[1].strip() or "0")
+                    except Exception:
+                        return None, None
+                else:
+                    try:
+                        h = int(txt)
+                    except Exception:
+                        return None, None
+                    m = 0
+
+                if h < 0:
+                    h = 0
+                if h > 23:
+                    h = 23
+                if m < 0:
+                    m = 0
+                if m > 59:
+                    m = 59
+
+                return h, m
+
+            def _format_hm(h, m):
+                return f"{int(h):02d}:{int(m):02d}"
+
+            def _get_existing_hm(schedule, key, default_h, default_m):
+                v = schedule.get(key, None)
+
+                if isinstance(v, int):
+                    return int(v), 0
+
+                if isinstance(v, str):
+                    s = v.strip()
+                    if ":" in s:
+                        parts = s.split(":")
+                        if len(parts) == 2:
+                            try:
+                                return int(parts[0]), int(parts[1])
+                            except Exception:
+                                return default_h, default_m
+                    try:
+                        return int(s), 0
+                    except Exception:
+                        return default_h, default_m
+
+                if isinstance(v, dict):
+                    try:
+                        h = int(v.get("h", v.get("hour", default_h)))
+                        m = int(v.get("m", v.get("minute", default_m)))
+                        return h, m
+                    except Exception:
+                        return default_h, default_m
+
+                return default_h, default_m
+
+            def _read_time_entry(entry, fallback_h, fallback_m):
+                txt = (entry.get_text() or "").strip()
+                if not txt:
+                    return fallback_h, fallback_m
+                h, m = _parse_time_text(txt)
+                if h is None or m is None:
+                    return fallback_h, fallback_m
+                return h, m
+
             # 1) Construire une config temporaire depuis l'UI (sans sauvegarder la vraie)
             cfg = json.loads(json.dumps(self.cfg))  # copie safe
 
@@ -3574,8 +4021,27 @@ class App(Gtk.Window):
             if hasattr(self, "spin_minutes"):
                 cfg["timer_minutes"] = int(self.spin_minutes.get_value())
 
-            # Schedule
-            if hasattr(self, "spin_nuit"):
+            # Schedule (HH:MM)
+            old_sch = cfg.get("schedule", {}) or {}
+            aube_h0, aube_m0 = _get_existing_hm(old_sch, "aube_start", 5, 0)
+            midi_h0, midi_m0 = _get_existing_hm(old_sch, "midi_start", 11, 0)
+            coucher_h0, coucher_m0 = _get_existing_hm(old_sch, "coucher_start", 16, 0)
+            nuit_h0, nuit_m0 = _get_existing_hm(old_sch, "nuit_start", 19, 0)
+
+            if hasattr(self, "entry_aube_time"):
+                aube_h, aube_m = _read_time_entry(self.entry_aube_time, aube_h0, aube_m0)
+                midi_h, midi_m = _read_time_entry(self.entry_midi_time, midi_h0, midi_m0)
+                coucher_h, coucher_m = _read_time_entry(self.entry_coucher_time, coucher_h0, coucher_m0)
+                nuit_h, nuit_m = _read_time_entry(self.entry_nuit_time, nuit_h0, nuit_m0)
+
+                cfg["schedule"] = {
+                    "aube_start": _format_hm(aube_h, aube_m),
+                    "midi_start": _format_hm(midi_h, midi_m),
+                    "coucher_start": _format_hm(coucher_h, coucher_m),
+                    "nuit_start": _format_hm(nuit_h, nuit_m),
+                }
+            # Fallback legacy si jamais tu lances on_test sans avoir l'UI mise a jour
+            elif hasattr(self, "spin_nuit"):
                 cfg["schedule"] = {
                     "nuit_start": int(self.spin_nuit.get_value()),
                     "aube_start": int(self.spin_aube.get_value()),
@@ -3600,7 +4066,6 @@ class App(Gtk.Window):
                 cfg["geolocation"]["city_name"] = self.city_entry.get_text().strip()
 
             if hasattr(self, "preset_combo"):
-                # value stored in combo id
                 preset_id = self.preset_combo.get_active_id() or "none"
                 cfg["geolocation"]["preset"] = preset_id
 
@@ -3631,6 +4096,7 @@ class App(Gtk.Window):
             self.message(_("ui.test-result"), out or _("(ui.test-result-empty)"))
         except Exception as e:
             self.message(_("ui.test-error"), str(e))
+
 
 
     def on_logs(self, _btn):

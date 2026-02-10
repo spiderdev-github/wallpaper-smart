@@ -230,13 +230,13 @@ Exemple :
 
 ```json
 {
-  "wallpaper_dir": "/home/user/.config/wallpaper-smart/wallpaper",
+  "wallpaper_dir": "/home/<user>/.config/wallpaper-smart/wallpaper",
   "wallpaper_theme": "default",
   "schedule": {
-    "nuit_start": 20,
-    "aube_start": 5,
-    "midi_start": 11,
-    "coucher_start": 17
+    "aube_start": "05:00",
+    "midi_start": "11:00",
+    "coucher_start": "16:00",
+    "nuit_start": "19:00"
   },
   "geolocation": {
     "mode": "fixed",

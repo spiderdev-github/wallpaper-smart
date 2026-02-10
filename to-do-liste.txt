@@ -1,6 +1,8 @@
-- themes : add lang management for name of theme in theme.json
-- remove wallpaper folder from dashboard to theme tab
-- Times: add minute management
-- Images: add click event on meteo row pannel
-- create crontab, if not systemd install it
-- Times: change frequence => if has systemd update service else crontab
+[ ] themes : add lang management for name of theme in theme.json
+[x] remove wallpaper folder from dashboard to theme tab
+[x] Times: add minute management
+[x] Remove click event on meteo row pannel
+[ ] create crontab, if not systemd install it
+[ ] Times: change frequence => if has systemd update service else crontab
+[x] switch light/dark 
+[x] remove refresh_preview where on_save (or/and reduce size of wallpaper)

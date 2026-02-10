@@ -360,7 +360,12 @@ minutes = int("${MINUTES}")
 default = {
   "wallpaper_dir": walldir,
   "wallpaper_theme": "default",
-  "schedule": {"nuit_start": 19, "aube_start": 5, "midi_start": 11, "coucher_start": 17},
+  "schedule": {
+    "aube_start": "05:00",
+    "midi_start": "11:00",
+    "coucher_start": "16:00",
+    "nuit_start": "19:00"
+  },
   "geolocation": {
     "mode": "${GEO_MODE}",
     "fixed": {"lat": ${GEO_LAT}, "lon": ${GEO_LON}},
@@ -373,7 +378,7 @@ default = {
     "fog": "brouillard",
     "rain": "pluie",
     "snow": "neige",
-    "thunder": "orage",
+    "thunder": "orage"
   },
   "timer_minutes": minutes,
   "enabled_images": {},
@@ -381,6 +386,8 @@ default = {
     "language": "system"
   }
 }
+
+
 
 def deep_merge(a, b):
   # returns merged dict: a as defaults, b overrides; merges nested dicts

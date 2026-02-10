@@ -11,7 +11,8 @@ case "$scheme" in
 esac
 
 # Optional: export to service via systemd env (if you want)
-# systemctl --user set-environment DESKTOP_STYLE="$mode"
+#systemctl --user set-environment DESKTOP_STYLE="$mode"
 
 # Restart (or start) your wallpaper service so it re-applies
-systemctl --user restart wallpaper-smart.service
+~/.local/bin/wallpaper-smart.sh
+# systemctl --user restart wallpaper-smart.service

@@ -70,18 +70,60 @@ TARGET="$WALLDIR/current.png"
 
 mkdir -p "$BASEDIR" "$METEODIR"
 
-# Schedule defaults
-NUIT_START=19
-AUBE_START=5
-MIDI_START=11
-COUCHER_START=17
+# Schedule defaults (minutes since midnight)
+NUIT_START_MIN=$((19*60))
+AUBE_START_MIN=$((5*60))
+MIDI_START_MIN=$((11*60))
+COUCHER_START_MIN=$((17*60))
+
+# Parse "HH:MM" or "H" into minutes since midnight
+to_minutes() {
+  local v="$1"
+  local def="$2"
+
+  # null/empty
+  if [[ -z "$v" || "$v" == "null" ]]; then
+    echo "$def"
+    return 0
+  fi
+
+  # If numeric hour
+  if [[ "$v" =~ ^[0-9]+$ ]]; then
+    local h="$v"
+    (( h < 0 )) && h=0
+    (( h > 23 )) && h=23
+    echo $((h*60))
+    return 0
+  fi
+
+  # If HH:MM
+  if [[ "$v" =~ ^([0-9]{1,2}):([0-9]{1,2})$ ]]; then
+    local h="${BASH_REMATCH[1]}"
+    local m="${BASH_REMATCH[2]}"
+    (( h < 0 )) && h=0
+    (( h > 23 )) && h=23
+    (( m < 0 )) && m=0
+    (( m > 59 )) && m=59
+    echo $((h*60 + m))
+    return 0
+  fi
+
+  # Fallback
+  echo "$def"
+}
 
 if [[ -f "$CONFIG_FILE" ]]; then
-  NUIT_START="$(jq -r '.schedule.nuit_start // 19' "$CONFIG_FILE" 2>/dev/null || echo 19)"
-  AUBE_START="$(jq -r '.schedule.aube_start // 5' "$CONFIG_FILE" 2>/dev/null || echo 5)"
-  MIDI_START="$(jq -r '.schedule.midi_start // 11' "$CONFIG_FILE" 2>/dev/null || echo 11)"
-  COUCHER_START="$(jq -r '.schedule.coucher_start // 17' "$CONFIG_FILE" 2>/dev/null || echo 17)"
+  NUIT_RAW="$(jq -r '.schedule.nuit_start // empty' "$CONFIG_FILE" 2>/dev/null || echo "")"
+  AUBE_RAW="$(jq -r '.schedule.aube_start // empty' "$CONFIG_FILE" 2>/dev/null || echo "")"
+  MIDI_RAW="$(jq -r '.schedule.midi_start // empty' "$CONFIG_FILE" 2>/dev/null || echo "")"
+  COUCHER_RAW="$(jq -r '.schedule.coucher_start // empty' "$CONFIG_FILE" 2>/dev/null || echo "")"
+
+  NUIT_START_MIN="$(to_minutes "$NUIT_RAW" "$NUIT_START_MIN")"
+  AUBE_START_MIN="$(to_minutes "$AUBE_RAW" "$AUBE_START_MIN")"
+  MIDI_START_MIN="$(to_minutes "$MIDI_RAW" "$MIDI_START_MIN")"
+  COUCHER_START_MIN="$(to_minutes "$COUCHER_RAW" "$COUCHER_START_MIN")"
 fi
+
 
 # -----------------------------
 # enabled_images : true par défaut
@@ -186,32 +228,41 @@ if [[ -f "$CONFIG_FILE" ]]; then
 fi
 [[ -z "$PREFIX" || "$PREFIX" == "null" ]] && PREFIX="clair"
 
+
 # -----------------------------
-# Moment du jour (horaires configurables)
+# Moment du jour (horaires configurables, minutes)
 # -----------------------------
 HOUR="$(date +%H)"
+MIN="$(date +%M)"
 HOUR=$((10#$HOUR))
+MIN=$((10#$MIN))
+NOW_MIN=$((HOUR*60 + MIN))
+
+in_range() {
+  # Usage: in_range now start end
+  # True if now in [start, end) on a circular 24h clock
+  local t="$1"
+  local start="$2"
+  local end="$3"
+
+  if (( start <= end )); then
+    (( t >= start && t < end ))
+  else
+    (( t >= start || t < end ))
+  fi
+}
 
 MOMENT="nuit"
-if (( HOUR >= AUBE_START && HOUR < MIDI_START )); then
+if in_range "$NOW_MIN" "$AUBE_START_MIN" "$MIDI_START_MIN"; then
   MOMENT="aube"
-elif (( HOUR >= MIDI_START && HOUR < COUCHER_START )); then
+elif in_range "$NOW_MIN" "$MIDI_START_MIN" "$COUCHER_START_MIN"; then
   MOMENT="midi"
+elif in_range "$NOW_MIN" "$COUCHER_START_MIN" "$NUIT_START_MIN"; then
+  MOMENT="coucher"
 else
-  if (( COUCHER_START < NUIT_START )); then
-    if (( HOUR >= COUCHER_START && HOUR < NUIT_START )); then
-      MOMENT="coucher"
-    else
-      MOMENT="nuit"
-    fi
-  else
-    if (( HOUR >= COUCHER_START || HOUR < NUIT_START )); then
-      MOMENT="coucher"
-    else
-      MOMENT="nuit"
-    fi
-  fi
+  MOMENT="nuit"
 fi
+
 
 # -----------------------------
 # Choix image finale
