@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -u
 import json
 import os
 import subprocess
@@ -26,7 +26,17 @@ import locale
 def _(s: str) -> str:
     return s
 
+# DEBUG FIX - Force output to terminal
+import sys
+sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
+sys.stderr.reconfigure(line_buffering=True) if hasattr(sys.stderr, 'reconfigure') else None
 
+def debug_print(*args):
+    """Use this instead of print() to see output in terminal"""
+    msg = ' '.join(str(a) for a in args)
+    sys.stderr.write(f"{msg}\n")
+    sys.stderr.flush()
+    
 
 APP_DIR = Path.home() / ".config" / "wallpaper-smart"
 CFG_PATH = APP_DIR / "config.json"
@@ -324,6 +334,28 @@ def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
 
 
 # ---------------- Wallpaper themes ----------------
+def generate_missing_thumbnails_for_theme(theme_dir: Path):
+    """Génère les miniatures manquantes pour tous les PNG d'un thème"""
+    try:
+        # Parcourir dark et light
+        for style_dir in [theme_dir / "dark", theme_dir / "light"]:
+            if not style_dir.exists():
+                continue
+            
+            # Parcourir base et meteo
+            for sub_dir in [style_dir / "base", style_dir / "meteo"]:
+                if not sub_dir.exists():
+                    continue
+                
+                # Trouver tous les fichiers PNG
+                for image_file in sub_dir.glob("*.png"):
+                    thumb_path = get_thumbnail_path(image_file)
+                    # Générer la miniature si elle n'existe pas
+                    if not thumb_path.exists():
+                        generate_thumbnail(image_file, image_file)
+    except Exception as e:
+        print(f"Erreur lors de la génération des miniatures pour {theme_dir}: {e}")
+
 def load_wallpaper_themes(wallpaper_dir: str) -> List[Tuple[str, str]]:
     root = Path(wallpaper_dir).expanduser()
 
@@ -367,6 +399,9 @@ def load_wallpaper_themes(wallpaper_dir: str) -> List[Tuple[str, str]]:
                 pass
 
         out.append((theme_id, label))
+        
+        # Générer les miniatures manquantes pour ce thème
+        generate_missing_thumbnails_for_theme(d)
 
     if not out:
         return [("default", "Defaut")]
@@ -1199,6 +1234,32 @@ def load_pixbuf_scaled(path: Path, max_w=420, max_h=240):
     new_h = max(1, int(h * scale))
     return pb.scale_simple(new_w, new_h, GdkPixbuf.InterpType.BILINEAR)
 
+def generate_thumbnail(src: Path, dst: Path, thumb_max_w=200, thumb_max_h=150):
+    """Génère une miniature de l'image source et la sauvegarde dans un dossier thumbnails"""
+    if not src.exists():
+        return
+    try:
+        pb = GdkPixbuf.Pixbuf.new_from_file(str(src))
+        w, h = pb.get_width(), pb.get_height()
+        scale = min(thumb_max_w / w, thumb_max_h / h)
+        new_w = max(1, int(w * scale))
+        new_h = max(1, int(h * scale))
+        thumb_pb = pb.scale_simple(new_w, new_h, GdkPixbuf.InterpType.BILINEAR)
+        
+        # Créer le dossier .thumbnails
+        thumb_dir = dst.parent / "thumbnails"
+        thumb_dir.mkdir(parents=True, exist_ok=True)
+        thumb_path = thumb_dir / dst.name
+        
+        # Sauvegarder la miniature en PNG
+        thumb_pb.savev(str(thumb_path), "png", [], [])
+    except Exception as e:
+        print(f"Erreur lors de la génération de la miniature: {e}")
+
+def get_thumbnail_path(image_path: Path) -> Path:
+    """Retourne le chemin de la miniature pour une image"""
+    return image_path.parent / "thumbnails" / image_path.name
+
 def make_page(child: Gtk.Widget):
     # Chaque onglet est scrollable : l'actionbar reste toujours visible.
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -1255,6 +1316,9 @@ class App(Gtk.Window):
         self.set_border_width(10)
         self.set_default_size(1020, 720)
         self.set_resizable(True)
+        
+        # Set icon for window and topbar
+        self.set_icon_name("preferences-desktop-wallpaper")
 
 
         self.cfg = load_cfg()
@@ -3809,6 +3873,10 @@ class App(Gtk.Window):
         #print(f"dest: {dst}")
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_bytes(src.read_bytes())
+        
+        # Générer une miniature de l'image
+        generate_thumbnail(src, dst)
+        
         self.refresh_images_preview(rel_path)
 
     def _rel_swap_style(self, rel: str, style: str) -> str:
@@ -3863,7 +3931,10 @@ class App(Gtk.Window):
                 exists = p.exists()
 
                 path_lbl.set_text(str(p))
-                pb = load_pixbuf_scaled(p) if exists else None
+                # Charger la miniature au lieu de la grande image
+                thumb_path = get_thumbnail_path(p)
+                thumb_exists = thumb_path.exists()
+                pb = load_pixbuf_scaled(thumb_path) if thumb_exists else (load_pixbuf_scaled(p) if exists else None)
                 if pb:
                     img_widget.set_from_pixbuf(pb)
                 else:
@@ -3914,7 +3985,10 @@ class App(Gtk.Window):
                 active_sw.handler_unblock(hid)
 
             path_lbl.set_text(str(p))
-            pb = load_pixbuf_scaled(p) if exists else None
+            # Charger la miniature au lieu de la grande image
+            thumb_path = get_thumbnail_path(p)
+            thumb_exists = thumb_path.exists()
+            pb = load_pixbuf_scaled(thumb_path) if thumb_exists else (load_pixbuf_scaled(p) if exists else None)
             if pb:
                 img_widget.set_from_pixbuf(pb)
             else:
