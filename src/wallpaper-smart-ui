@@ -13,7 +13,14 @@ import threading
 
 
 gi.require_version("Gtk", "3.0")
+gi.require_version("AppIndicator3", "0.1")
 from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib
+try:
+    from gi.repository import AppIndicator3
+    HAS_APPINDICATOR = True
+except ImportError:
+    HAS_APPINDICATOR = False
+    print("AppIndicator3 non disponible - l'icône système ne sera pas affichée")
 
 import urllib.request
 import urllib.error
@@ -1293,6 +1300,10 @@ class App(Gtk.Window):
         self._dark = detect_dark_mode()
         apply_css(self._dark)
 
+        # Initialize AppIndicator
+        self.indicator = None
+        self._setup_indicator()
+
         try:
             # GNOME 42+: key may or may not exist depending on version
             self._gnome_iface = Gio.Settings.new("org.gnome.desktop.interface")
@@ -1319,6 +1330,9 @@ class App(Gtk.Window):
         
         # Set icon for window and topbar
         self.set_icon_name("preferences-desktop-wallpaper")
+
+        # Handle window close event
+        self.connect("delete-event", self._on_window_delete)
 
 
         self.cfg = load_cfg()
@@ -1568,6 +1582,106 @@ class App(Gtk.Window):
             self.queue_draw()
         except Exception:
             pass
+    
+    # ================== AppIndicator Methods ==================
+    def _setup_indicator(self):
+        """Configure l'indicateur système (system tray)"""
+        if not HAS_APPINDICATOR:
+            return
+        
+        try:
+            # Chemin de l'icône
+            icon_path = Path.home() / ".local/share/icons/wallpaper-smart-tray.svg"
+            
+            # Créer l'indicateur
+            self.indicator = AppIndicator3.Indicator.new(
+                "wallpaper-smart",
+                str(icon_path) if icon_path.exists() else "preferences-desktop-wallpaper",
+                AppIndicator3.IndicatorCategory.APPLICATION_STATUS
+            )
+            self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+            self.indicator.set_title("Wallpaper Smart")
+            
+            # Créer le menu
+            menu = self._create_indicator_menu()
+            self.indicator.set_menu(menu)
+            
+        except Exception as e:
+            debug_print(f"Erreur lors de la création de l'indicateur: {e}")
+    
+    def _create_indicator_menu(self):
+        """Crée le menu contextuel de l'indicateur"""
+        menu = Gtk.Menu()
+        
+        # Ouvrir l'interface
+        item_show = Gtk.MenuItem(label=_("Ouvrir l'interface"))
+        item_show.connect("activate", self._on_indicator_show)
+        menu.append(item_show)
+        
+        menu.append(Gtk.SeparatorMenuItem())
+        
+        # Rafraîchir le fond d'écran
+        item_refresh = Gtk.MenuItem(label=_("Rafraîchir le fond d'écran"))
+        item_refresh.connect("activate", self._on_indicator_refresh)
+        menu.append(item_refresh)
+        
+        menu.append(Gtk.SeparatorMenuItem())
+        
+        # À propos
+        item_about = Gtk.MenuItem(label=_("À propos"))
+        item_about.connect("activate", self._on_indicator_about)
+        menu.append(item_about)
+        
+        menu.append(Gtk.SeparatorMenuItem())
+        
+        # Quitter
+        item_quit = Gtk.MenuItem(label=_("Quitter"))
+        item_quit.connect("activate", self._on_indicator_quit)
+        menu.append(item_quit)
+        
+        menu.show_all()
+        return menu
+    
+    def _on_window_delete(self, widget, event):
+        """Gérer la fermeture de la fenêtre - cacher au lieu de quitter"""
+        self.hide()
+        return True  # Empêche la destruction de la fenêtre
+    
+    def _on_indicator_show(self, widget):
+        """Afficher/restaurer la fenêtre depuis le tray"""
+        self.present()
+        self.show_all()
+    
+    def _on_indicator_refresh(self, widget):
+        """Rafraîchir manuellement le fond d'écran"""
+        try:
+            script = Path.home() / ".local/bin/wallpaper-smart.sh"
+            subprocess.run(
+                [str(script)],
+                env={**os.environ, "CONFIG_FILE": str(CFG_PATH)},
+                capture_output=True,
+                text=True
+            )
+            # Rafraîchir le dashboard
+            if hasattr(self, 'refresh_dashboard'):
+                GLib.idle_add(self.refresh_dashboard)
+        except Exception as e:
+            debug_print(f"Erreur lors du rafraîchissement: {e}")
+    
+    def _on_indicator_about(self, widget):
+        """Afficher la fenêtre À propos"""
+        self.present()
+        self.show_all()
+        # Basculer vers l'onglet À propos si disponible
+        if hasattr(self, 'notebook'):
+            # L'onglet À propos est généralement le dernier
+            self.notebook.set_current_page(self.notebook.get_n_pages() - 1)
+    
+    def _on_indicator_quit(self, widget):
+        """Quitter complètement l'application"""
+        Gtk.main_quit()
+    
+    # ================== Fin AppIndicator Methods ==================
     
     def _get_theme_id_from_ui_or_cfg(self) -> str:
         theme = None
@@ -4410,8 +4524,16 @@ class App(Gtk.Window):
 
 def main():
     win = App()
-    win.connect("destroy", Gtk.main_quit)
-    win.show_all()
+    win.connect("destroy", lambda w: Gtk.main_quit() if not HAS_APPINDICATOR else None)
+    
+    # Démarrer minimisé dans le tray si AppIndicator est disponible
+    if HAS_APPINDICATOR and win.indicator:
+        # Ne pas afficher la fenêtre au démarrage
+        pass
+    else:
+        # Si pas d'AppIndicator, afficher normalement
+        win.show_all()
+    
     Gtk.main()
 
 if __name__ == "__main__":

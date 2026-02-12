@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Cadre de fond d'écran -->
+  <rect x="3" y="4" width="18" height="14" rx="2" stroke="white" stroke-width="1.5" fill="none"/>
+  
+  <!-- Soleil (jour) -->
+  <circle cx="8.5" cy="9.5" r="2" fill="white" opacity="0.9"/>
+  <line x1="8.5" y1="6" x2="8.5" y2="7" stroke="white" stroke-width="1" opacity="0.9"/>
+  <line x1="8.5" y1="12" x2="8.5" y2="13" stroke="white" stroke-width="1" opacity="0.9"/>
+  <line x1="11" y1="9.5" x2="12" y2="9.5" stroke="white" stroke-width="1" opacity="0.9"/>
+  <line x1="5" y1="9.5" x2="6" y2="9.5" stroke="white" stroke-width="1" opacity="0.9"/>
+  
+  <!-- Nuage stylisé -->
+  <path d="M13 12c0-0.8 0.6-1.5 1.5-1.5 0.2 0 0.4 0.05 0.6 0.15 0.2-0.4 0.6-0.65 1.1-0.65 0.7 0 1.3 0.6 1.3 1.3 0 0.15-0.03 0.3-0.08 0.43 0.35 0.2 0.58 0.57 0.58 0.97 0 0.66-0.54 1.2-1.2 1.2H14c-0.83 0-1.5-0.67-1.5-1.5z" 
+        fill="white" opacity="0.7"/>
+  
+  <!-- Ligne d'horizon minimaliste -->
+  <path d="M4 15 L8 13 L12 14 L16 12 L20 14" stroke="white" stroke-width="1.2" opacity="0.6" fill="none"/>
+</svg>

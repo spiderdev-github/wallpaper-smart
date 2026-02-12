@@ -114,12 +114,14 @@ install_deps() {
       $sudo_cmd apt-get install -y \
         curl jq \
         python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 \
+        gir1.2-appindicator3-0.1 \
         xdg-utils || true
       ;;
     dnf)
       $sudo_cmd dnf install -y \
         curl jq \
         python3 python3-gobject gtk3 python3-cairo \
+        libappindicator-gtk3 \
         xdg-utils || true
       ;;
     yum)
@@ -132,6 +134,7 @@ install_deps() {
       $sudo_cmd pacman -Sy --noconfirm \
         curl jq \
         python python-gobject gtk3 python-cairo \
+        libappindicator-gtk3 \
         xdg-utils || true
       ;;
     zypper)
@@ -160,16 +163,17 @@ Dépendances requises (noms variables selon distro) :
   - bash, curl, jq
   - python3
   - GTK3 + PyGObject (gi) + Cairo bindings
+  - AppIndicator3 (pour l'icône système)
 
 Exemples :
   Debian/Ubuntu:
-    sudo apt install curl jq python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0
+    sudo apt install curl jq python3 python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-appindicator3-0.1
   Fedora:
-    sudo dnf install curl jq python3 python3-gobject gtk3 python3-cairo
+    sudo dnf install curl jq python3 python3-gobject gtk3 python3-cairo libappindicator-gtk3
   Arch:
-    sudo pacman -S curl jq python python-gobject gtk3 python-cairo
+    sudo pacman -S curl jq python python-gobject gtk3 python-cairo libappindicator-gtk3
   openSUSE:
-    sudo zypper install curl jq python3 python3-gobject-Gdk gtk3 python3-cairo
+    sudo zypper install curl jq python3 python3-gobject-Gdk gtk3 python3-cairo libappindicator3
 EOF
 }
 
@@ -292,6 +296,18 @@ install -m 755 "$SRC/wallpaper-smart-on-style-change.sh" "$HOME/.local/bin/wallp
 install -m 755 "$SRC/wallpaper-smart-style-hook.service" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.service"
 install -m 755 "$SRC/wallpaper-smart-style-hook.path" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.path"
 
+log "Installation de l'icône système..."
+ICON_DIR="$HOME/.local/share/icons"
+mkdir -p "$ICON_DIR"
+if [[ -f "$SRC/wallpaper-smart-tray-icon.svg" ]]; then
+    install -m 644 "$SRC/wallpaper-smart-tray-icon.svg" "$ICON_DIR/wallpaper-smart-tray.svg"
+    log "✅ Icône système installée"
+    if has gtk-update-icon-cache; then
+        gtk-update-icon-cache -f -t "$ICON_DIR" 2>/dev/null || true
+    fi
+else
+    warn "Icône système non trouvée: $SRC/wallpaper-smart-tray-icon.svg (l'app fonctionnera sans icône personnalisée)"
+fi
 
 log "Installation des langs dans ~/.config/wallpaper-smart (écrasement si existant)..."
 
