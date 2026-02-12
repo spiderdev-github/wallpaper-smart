@@ -1,23 +1,51 @@
-[x] remove wallpaper folder from dashboard to theme tab
-[x] Times: add minute management
-[x] Remove click event on meteo row pannel
-[x] switch light/dark 
-[x] remove refresh_preview where on_save (or/and reduce size of wallpaper)
-[x] auto load schedules
-[x] when change location reload shedules if auto load is on
-[ ] themes : add lang management for name of theme in theme.json
-[ ] install : create crontab, if not systemd install it
-[ ] Times: change frequence => if has systemd update service else crontab
-[ ] * disable delete btn schedule if auto load
-[ ] * onload if auto schedule disable time inputs
-[ ] change localisation tab, make two bloc (choose and lat/lon/city)
-[ ] location tab : change style of btn empty city
-[ ] schedule tab : add lang var for auto shedules 
-[ ] general : update all lang files
-[ ] themes meteo panel : change switch btn css
-[ ] themes meteo panel : add active label (if current)
-[x] themes add thumb management
-[ ] Shedule tab : if change value disable auto schedule !!!
-[ ] Fix: meteo panel, disable/enable wallpaper
-[ ] dashboard add shedules info
-[ ] add tab settings (langue / wallpaper dir)
+# UK version
+
+[x] Move wallpaper folder from Dashboard to Theme tab
+[x] Times: add minute-level handling
+[x] Remove click event on weather row panel
+[x] Toggle light/dark theme
+[x] Remove refresh_preview on save (and/or reduce wallpaper size)
+[x] Auto-load schedules
+[x] Reload schedules when location changes if auto-load is enabled
+[ ] Themes: add language support for theme name in theme.json
+[ ] Install: create a crontab; if systemd is unavailable, install it
+[ ] Times: change frequency — if systemd present, update service; otherwise update crontab
+[ ] * Disable schedule delete button when auto-load is enabled
+[ ] * On load, if auto-schedule enabled, disable time inputs
+[ ] Modify location tab: split into two blocks (preset and lat/lon/city)
+[ ] Location tab: change style of 'empty city' button
+[ ] Schedules tab: add language variable for auto schedules
+[ ] General: update all language files
+[ ] Themes weather panel: change toggle button CSS
+[ ] Themes weather panel: add 'active' label (for current)
+[x] Themes: add thumbnail management
+[ ] Schedules tab: if value changes, disable auto-schedule !!!
+[ ] Fix: weather panel — enable/disable wallpaper
+[ ] Dashboard: add schedules info
+[ ] Add Settings tab (language / wallpaper directory)
+
+# FR version
+
+[x] Déplacer dossier wallpaper du Dashboard vers onglet Thème
+[x] Horaires : gestion des minutes
+[x] Supprimer clic sur ligne météo
+[x] Basculer clair/obscur
+[x] Supprimer refresh_preview à l'enregistrement (ou réduire la taille du fond)
+[x] Chargement automatique des plannings
+[x] Recharger plannings au changement de localisation si auto-load activé
+[ ] Thèmes : ajouter traduction du nom du thème dans theme.json
+[ ] Installation : créer crontab ; si pas de systemd, l'installer
+[ ] Horaires : changer fréquence — si systemd, mettre à jour le service ; sinon la crontab
+[ ] * Désactiver suppression de planning quand auto-load activé
+[ ] * Au chargement, si auto-schedule, désactiver champs temps
+[ ] Réorganiser onglet localisation : deux blocs (présets / lat/lon/ville)
+[ ] Onglet localisation : modifier style du bouton 'ville vide'
+[ ] Onglet plannings : ajouter variable de langue pour plannings automatiques
+[ ] Général : mettre à jour tous les fichiers de langue
+[ ] Panneau météo (thèmes) : modifier le CSS du bouton bascule
+[ ] Panneau météo (thèmes) : ajouter étiquette 'actif' (si courant)
+[x] Thèmes : gestion des miniatures
+[ ] Onglet plannings : désactiver auto-plannings si valeur modifiée
+[ ] Fix : panneau météo — activer/désactiver fond d'écran
+[ ] Tableau de bord : ajouter infos sur plannings
+[ ] Ajouter onglet Paramètres (langue / dossier fonds d'écran)
