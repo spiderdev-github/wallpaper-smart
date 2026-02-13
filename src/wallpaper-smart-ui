@@ -340,6 +340,36 @@ def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
     return int(cur.get("weather_code") or 0)
 
 
+def weather_code_to_bucket(code: int) -> str:
+    """Convertit un code météo WMO en bucket (clear, cloudy, fog, rain, snow, thunder)"""
+    if code == 0 or code == 1:
+        return "clear"
+    elif code == 2 or code == 3:
+        return "cloudy"
+    elif code == 45 or code == 48:
+        return "fog"
+    elif code in range(51, 68) or code in range(80, 83):
+        return "rain"
+    elif code in range(71, 78) or code in range(85, 87):
+        return "snow"
+    elif code in range(95, 100):
+        return "thunder"
+    else:
+        return "cloudy"  # fallback
+
+
+def country_code_to_flag(country_code: str) -> str:
+    """Convertit un code pays ISO (2 lettres) en emoji drapeau
+    Exemple: 'FR' -> '🇫🇷', 'US' -> '🇺🇸'
+    """
+    if not country_code or len(country_code) != 2:
+        return ""
+
+    # Les emojis de drapeaux utilisent des Regional Indicator Symbols
+    # A = U+1F1E6, B = U+1F1E7, ..., Z = U+1F1FF
+    return ''.join(chr(0x1F1E6 + ord(char) - ord('A')) for char in country_code.upper())
+
+
 # ---------------- Wallpaper themes ----------------
 def generate_missing_thumbnails_for_theme(theme_dir: Path):
     """Génère les miniatures manquantes pour tous les PNG d'un thème"""
@@ -446,12 +476,12 @@ def _http_json(url: str, timeout: int = 5) -> Dict[str, Any]:
     return obj
 
 
-def geocode_city_nominatim(city: str, timeout: int = 6) -> Tuple[float, float, str]:
+def geocode_city_nominatim(city: str, timeout: int = 6) -> Tuple[float, float, str, str]:
     import json
     from urllib.parse import quote
 
     q = quote(city)
-    url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1&addressdetails=0"
+    url = f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1&addressdetails=1"
 
     req = urllib.request.Request(
         url,
@@ -476,11 +506,15 @@ def geocode_city_nominatim(city: str, timeout: int = 6) -> Tuple[float, float, s
     lon = float(item.get("lon"))
     display = (item.get("display_name") or "").strip()
 
+    # Récupérer le code pays depuis address
+    address = item.get("address", {})
+    country_code = (address.get("country_code") or "").strip().upper()
+
     # Keep display short
     if display and len(display) > 60:
         display = display.split(",")[0].strip()
 
-    return lat, lon, display
+    return lat, lon, display, country_code
 
 # ---------------- Theme detection + CSS ----------------
 
@@ -514,7 +548,7 @@ def detect_dark_mode() -> bool:
 
 
 def _auto_ip_details() -> Dict[str, str | float]:
-    """Return best-effort IP-based geolocation details (lat, lon, city, region, country)."""
+    """Return best-effort IP-based geolocation details (lat, lon, city, region, country, country_code)."""
     try:
         print("Fetching auto IP geolocation details...", flush=True)
 
@@ -527,6 +561,7 @@ def _auto_ip_details() -> Dict[str, str | float]:
         city = (g.get("city") or "").strip()
         region = (g.get("region") or "").strip()
         country = (g.get("country_name") or g.get("country") or "").strip()
+        country_code = (g.get("country_code") or "").strip()
 
         out: Dict[str, str | float] = {}
         if lat is not None:
@@ -539,6 +574,8 @@ def _auto_ip_details() -> Dict[str, str | float]:
             out["region"] = region
         if country:
             out["country"] = country
+        if country_code:
+            out["country_code"] = country_code
 
         print(f"out={out}", flush=True)
         return out
@@ -1423,6 +1460,10 @@ class App(Gtk.Window):
         # Then every 10 minutes (avoid hammering API)
         GLib.timeout_add_seconds(600, self._timer_refresh_preset_icons)
 
+        # Mettre à jour la météo dans l'AppIndicator (après que self.cfg soit chargé)
+        if HAS_APPINDICATOR and hasattr(self, 'indicator') and self.indicator:
+            GLib.timeout_add(1000, lambda: (self._update_indicator_weather(), False)[1])
+
     def on_city_clear_clicked(self, _btn):
         try:
             self.city_entry.set_text("")
@@ -1439,13 +1480,15 @@ class App(Gtk.Window):
                 self.city_entry.grab_focus()
                 return
 
-            lat, lon, display = geocode_city_nominatim(city, timeout=6)
+            lat, lon, display, country_code = geocode_city_nominatim(city, timeout=6)
             self.lat_entry.set_text(f"{lat:.4f}")
             self.lon_entry.set_text(f"{lon:.4f}")
 
-            # Optional: replace by normalized label
+            # Optional: replace by normalized label with flag
             if display:
-                self.city_entry.set_text(display)
+                flag = country_code_to_flag(country_code)
+                display_with_flag = f"{flag} {display}".strip() if flag else display
+                self.city_entry.set_text(display_with_flag)
 
             self.city_entry.grab_focus()
         except Exception as e:
@@ -1588,11 +1631,11 @@ class App(Gtk.Window):
         """Configure l'indicateur système (system tray)"""
         if not HAS_APPINDICATOR:
             return
-        
+
         try:
             # Chemin de l'icône
             icon_path = Path.home() / ".local/share/icons/wallpaper-smart-tray.svg"
-            
+
             # Créer l'indicateur
             self.indicator = AppIndicator3.Indicator.new(
                 "wallpaper-smart",
@@ -1601,11 +1644,14 @@ class App(Gtk.Window):
             )
             self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
             self.indicator.set_title("Wallpaper Smart")
-            
+
             # Créer le menu
             menu = self._create_indicator_menu()
             self.indicator.set_menu(menu)
-            
+
+            # Rafraîchir la météo toutes les 10 minutes (600000 ms)
+            GLib.timeout_add(600000, self._update_indicator_weather)
+
         except Exception as e:
             debug_print(f"Erreur lors de la création de l'indicateur: {e}")
     
@@ -1673,14 +1719,128 @@ class App(Gtk.Window):
         self.present()
         self.show_all()
         # Basculer vers l'onglet À propos si disponible
-        if hasattr(self, 'notebook'):
-            # L'onglet À propos est généralement le dernier
-            self.notebook.set_current_page(self.notebook.get_n_pages() - 1)
+        if hasattr(self, 'nb'):
+            # L'onglet À propos est le dernier
+            self.nb.set_current_page(self.nb.get_n_pages() - 1)
     
     def _on_indicator_quit(self, widget):
         """Quitter complètement l'application"""
         Gtk.main_quit()
-    
+
+    def _get_current_coordinates(self):
+        """Récupère les coordonnées actuelles basées sur le mode de géolocalisation"""
+        try:
+            geo = self.cfg.get("geolocation", {})
+            mode = geo.get("mode", "auto_ip")
+
+            if mode == "fixed":
+                fixed = geo.get("fixed", {})
+                lat = fixed.get("lat")
+                lon = fixed.get("lon")
+                city = geo.get("city_name", "")
+                if lat is not None and lon is not None:
+                    return float(lat), float(lon), city
+            elif mode == "auto_ip":
+                # Récupérer via IP
+                details = _auto_ip_details()
+                if "lat" in details and "lon" in details:
+                    lat = details["lat"]
+                    lon = details["lon"]
+                    city = details.get("city", geo.get("city_name", ""))
+
+                    # Sauvegarder les coordonnées réussies pour usage futur
+                    try:
+                        geo.setdefault("last_known_coordinates", {})
+                        geo["last_known_coordinates"]["lat"] = lat
+                        geo["last_known_coordinates"]["lon"] = lon
+                        geo["last_known_coordinates"]["city"] = city
+                        save_cfg(self.cfg)
+                        debug_print(f"Coordonnées sauvegardées: lat={lat}, lon={lon}, city={city}")
+                    except Exception as save_err:
+                        debug_print(f"Erreur lors de la sauvegarde des coordonnées: {save_err}")
+
+                    return float(lat), float(lon), str(city)
+                else:
+                    # Fallback 1: Essayer les dernières coordonnées connues
+                    last_known = geo.get("last_known_coordinates", {})
+                    if "lat" in last_known and "lon" in last_known:
+                        lat = last_known["lat"]
+                        lon = last_known["lon"]
+                        city = last_known.get("city", "")
+                        debug_print(f"Utilisation des dernières coordonnées connues: lat={lat}, lon={lon}, city={city}")
+                        return float(lat), float(lon), str(city)
+
+                    # Fallback 2: Essayer les coordonnées fixes si disponibles
+                    fixed = geo.get("fixed", {})
+                    if "lat" in fixed and "lon" in fixed:
+                        lat = fixed["lat"]
+                        lon = fixed["lon"]
+                        city = geo.get("city_name", "")
+                        debug_print(f"Utilisation des coordonnées fixes comme fallback: lat={lat}, lon={lon}, city={city}")
+                        return float(lat), float(lon), str(city)
+
+            # Fallback sur les coordonnées par défaut
+            return None, None, ""
+        except Exception as e:
+            debug_print(f"Erreur lors de la récupération des coordonnées: {e}")
+            return None, None, ""
+
+    def _update_indicator_weather(self):
+        """Met à jour le label de l'indicateur avec la météo actuelle"""
+        try:
+            debug_print("=== _update_indicator_weather appelé ===")
+
+            if not HAS_APPINDICATOR or not self.indicator:
+                debug_print("AppIndicator non disponible ou indicateur non créé")
+                return True
+
+            # Vérifier que la config est chargée
+            if not hasattr(self, 'cfg'):
+                debug_print("Config pas encore chargée")
+                return True
+
+            # Récupérer les coordonnées
+            lat, lon, city = self._get_current_coordinates()
+            debug_print(f"Coordonnées récupérées: lat={lat}, lon={lon}, city={city}")
+
+            if lat is None or lon is None:
+                # Pas de coordonnées disponibles
+                debug_print("Pas de coordonnées disponibles, on vide le label")
+                self.indicator.set_label("", "")
+                return True
+
+            # Récupérer le code météo
+            code = fetch_weather_code(lat, lon, timeout=5)
+            debug_print(f"Code météo récupéré: {code}")
+
+            # Convertir en bucket
+            bucket = weather_code_to_bucket(code)
+            debug_print(f"Bucket: {bucket}")
+
+            # Récupérer l'emoji et le nom
+            meteo_txt, emoji = BUCKET_LABELS.get(bucket, (bucket, "🌡️"))
+            debug_print(f"Météo: {meteo_txt}, emoji: {emoji}")
+
+            # Construire le label
+            if city:
+                label = f"{emoji} {city}"
+            else:
+                label = f"{emoji} {meteo_txt}"
+
+            debug_print(f"Label final: '{label}'")
+
+            # Mettre à jour l'indicateur (utiliser à la fois label et title pour compatibilité)
+            self.indicator.set_label(label, label)
+            self.indicator.set_title(label)
+            debug_print("Label et titre mis à jour avec succès")
+
+        except Exception as e:
+            debug_print(f"Erreur lors de la mise à jour de la météo: {e}")
+            import traceback
+            debug_print(traceback.format_exc())
+
+        return True  # Retourner True pour que le timer continue
+
     # ================== Fin AppIndicator Methods ==================
     
     def _get_theme_id_from_ui_or_cfg(self) -> str:
@@ -3855,13 +4015,19 @@ class App(Gtk.Window):
                 city = str(d.get("city") or "").strip()
                 region = str(d.get("region") or "").strip()
                 country = str(d.get("country") or "").strip()
+                country_code = str(d.get("country_code") or "").strip()
+
                 label = city
                 if region and region not in label:
                     label = (label + f", {region}") if label else region
                 if country and country not in label:
                     label = (label + f", {country}") if label else country
+
+                # Ajouter le drapeau au début
                 if label:
-                    self.city_entry.set_text(label)
+                    flag = country_code_to_flag(country_code)
+                    label_with_flag = f"{flag} {label}".strip() if flag else label
+                    self.city_entry.set_text(label_with_flag)
         except Exception:
             pass
 
@@ -4336,6 +4502,10 @@ class App(Gtk.Window):
             self.refresh_toggle_label()
             self.refresh_dashboard()
             # self.refresh_images_preview()
+
+            # Mettre à jour la météo dans l'AppIndicator
+            if HAS_APPINDICATOR and hasattr(self, '_update_indicator_weather'):
+                self._update_indicator_weather()
         except Exception as e:
             self.message("Erreur", str(e))
 
@@ -4538,3 +4708,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
