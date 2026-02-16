@@ -72,16 +72,24 @@ Règles de versioning utilisées dans ce dépôt :
   - (selon les fichiers disponibles dans `lang/`)
 
 - 🖥️ **Interface GTK (Wallpaper Smart UI)**
-  - aperçu des images
+  - aperçu des images avec miniatures
   - sélection rapide des fichiers
   - activation / désactivation des images météo
   - test instantané sans sauvegarde
+  - conservation de la sélection après le choix d'image météo
+  - carte de thème déplacée vers l'onglet images pour une meilleure organisation
+
+- 📊 **Indicateur d'application (AppIndicator)**
+  - icône dans la barre d'état système
+  - affichage du moment de la journée, de la météo et de la ville
+  - menu rapide pour accéder aux fonctionnalités principales
 
 - ⏱️ **Mises à jour automatiques**
   - le fond est appliqué **à la connexion utilisateur**
   - mises à jour périodiques via **systemd user timer**
+  - **précision à la minute** pour les créneaux horaires (aube, midi, coucher, nuit)
   - rafraîchissement instantané lors des changements clair/sombre GNOME
-  - repli possible vers cron si systemd n’est pas disponible
+  - repli possible vers cron si systemd n'est pas disponible
 
 - 📍 **Géolocalisation à l’installation (optionnelle)**
   - détection automatique d’une position par défaut lors de `install.sh`
@@ -101,8 +109,9 @@ Règles de versioning utilisées dans ce dépôt :
 - ✅ KDE Plasma (support par script)
 - ✅ GTK3 (interface)
 - ✅ systemd user (recommandé)
+- ✅ AppIndicator (barre d'état système)
 
-> L’application détecte automatiquement l’environnement (GNOME / KDE) et applique le fond d’écran avec la méthode appropriée.
+> L'application détecte automatiquement l'environnement (GNOME / KDE) et applique le fond d'écran avec la méthode appropriée.
 
 ---
 
@@ -113,6 +122,7 @@ Installateur (best-effort) :
 - `git`, `bash`, `curl`, `jq`
 - `python3`
 - `python3-gi` + GTK3 + Cairo (selon la distribution)
+- `gir1.2-appindicator3-0.1` (pour l'indicateur d'application dans la barre d'état)
 - `xdg-utils`
 - KDE : `qdbus` ou `qdbus-qt5` (selon la distribution)
 
@@ -411,28 +421,32 @@ chmod +x uninstall.sh
 Wallpaper-Smart évolue progressivement pour devenir un **moteur de fonds d’écran intelligent, flexible et entièrement personnalisable**, basé sur la météo et le moment de la journée.
 
 ### ✅ Fonctionnalités terminées
-- Support multi-langue de l’interface  
-- Compatibilité KDE Plasma  
-- Intégration météo en temps réel pour des emplacements prédéfinis  
-- Détection automatique de la géolocalisation lors de l’installation (optionnelle)  
-- Géolocalisation par ville avec récupération automatique de la latitude et longitude  
-- Gestion des thèmes de fonds d’écran en mode clair et sombre  
-- Amélioration des logs avec une interface plus lisible  
-- Alerte visuelle lorsqu’un fond d’écran météo est manquant  
-- Section “À propos” et bouton de don  
+- Support multi-langue de l'interface
+- Compatibilité KDE Plasma
+- Intégration météo en temps réel pour des emplacements prédéfinis
+- Détection automatique de la géolocalisation lors de l'installation (optionnelle)
+- Géolocalisation par ville avec récupération automatique de la latitude et longitude
+- Gestion des thèmes de fonds d'écran en mode clair et sombre
+- Amélioration des logs avec une interface plus lisible
+- Alerte visuelle lorsqu'un fond d'écran météo est manquant
+- Section "À propos" et bouton de don
+- Indicateur d'application (AppIndicator) dans la barre d'état système
+- Précision à la minute pour les créneaux horaires (aube, midi, coucher, nuit)
+- Amélioration de l'onglet Images avec conservation de sélection et miniatures
+- Fonds d'écran météo HD par défaut
+- Nouveaux thèmes disponibles (digital_even)  
 
 ### 🧩 Expérience des thèmes (à venir)
-- Gestion avancée des thèmes avec aperçu en temps réel  
-- Import / export de thèmes pour faciliter le partage  
-- Localisation des noms de thèmes via la gestion des langues dans `theme.json`  
-- Interface épurée : déplacement de la gestion des dossiers de fonds d’écran du tableau de bord vers l’onglet thèmes  
+- Gestion avancée des thèmes avec aperçu en temps réel
+- Import / export de thèmes pour faciliter le partage
+- Localisation des noms de thèmes via la gestion des langues dans `theme.json`
+- Onglet dédié à la gestion des thèmes avec prévisualisation complète  
 
 ### ⏱️ Planification intelligente
-- Précision à la minute pour les créneaux horaires (aube, midi, coucher du soleil, nuit)  
 - Moteur de planification intelligent :
-  - Utilisation automatique de `systemd` lorsqu’il est disponible  
-  - Repli sur `crontab` en l’absence de `systemd`  
-  - Mise à jour dynamique de la fréquence d’exécution sans intervention manuelle  
+  - Utilisation automatique de `systemd` lorsqu'il est disponible
+  - Repli sur `crontab` en l'absence de `systemd`
+  - Mise à jour dynamique de la fréquence d'exécution sans intervention manuelle  
 
 ### 🌦️ Météo & interactions
 - Panneau météo interactif  
