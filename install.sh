@@ -37,7 +37,7 @@ CITY_DEFAULT="Paris"
 NO_GEO=0
 
 WALLDIR="$WALLDIR_DEFAULT"
-MINUTES="1"
+MINUTES="10"
 NO_DEPS=0
 FORCE_TEMPLATES=0
 
@@ -293,8 +293,8 @@ install -m 755 "$SRC/wallpaper-smart-mkplaceholders.sh" "$HOME/.local/bin/wallpa
 
 
 install -m 755 "$SRC/wallpaper-smart-on-style-change.sh" "$HOME/.local/bin/wallpaper-smart-on-style-change.sh"
-install -m 755 "$SRC/wallpaper-smart-style-hook.service" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.service"
-install -m 755 "$SRC/wallpaper-smart-style-hook.path" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.path"
+install -m 644 "$SRC/wallpaper-smart-style-hook.service" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.service"
+install -m 644 "$SRC/wallpaper-smart-style-hook.path" "$HOME/.config/systemd/user/wallpaper-smart-style-hook.path"
 
 log "Installation de l'icône système..."
 ICON_DIR="$HOME/.local/share/icons"
@@ -492,7 +492,7 @@ Name=Wallpaper Smart
 Comment=Configurer le fond d'ecran dynamique (heure + meteo)
 Keywords=wallpaper;fond;meteo;
 Exec=$HOME/.local/bin/wallpaper-smart-ui
-Icon=preferences-desktop-wallpaper
+Icon=wallpaper-smart-tray
 Terminal=false
 Categories=Settings;Utility;
 StartupNotify=true

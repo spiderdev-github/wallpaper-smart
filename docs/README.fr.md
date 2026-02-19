@@ -170,7 +170,7 @@ Installateur (best-effort) :
 │                   └── ...
 │
 └── lang/
-    ├── en_US.json
+    ├── en_GB.json
     ├── fr_FR.json
     ├── de_DE.json
     └── ...

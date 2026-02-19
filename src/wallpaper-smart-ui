@@ -3,18 +3,23 @@ import json
 import os
 import subprocess
 import urllib.request
+import urllib.error
+import gi
+import threading
+import socket
+import gettext
+import locale
+import sys
+from concurrent.futures import ThreadPoolExecutor
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("AppIndicator3", "0.1")
 
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Dict
 from datetime import datetime
-
-import gi
-import threading
-
-
-gi.require_version("Gtk", "3.0")
-gi.require_version("AppIndicator3", "0.1")
 from gi.repository import Gtk, Gdk, GdkPixbuf, Gio, GLib
+
 try:
     from gi.repository import AppIndicator3
     HAS_APPINDICATOR = True
@@ -22,19 +27,19 @@ except ImportError:
     HAS_APPINDICATOR = False
     print("AppIndicator3 non disponible - l'icône système ne sera pas affichée")
 
-import urllib.request
-import urllib.error
-import socket
 
-import gettext
-import locale
-
-
-def _(s: str) -> str:
-    return s
+def _(key: str) -> str:
+    try:
+        if key in _tr:
+            return str(_tr[key])
+        if key in _tr_fallback:
+            return str(_tr_fallback[key])
+        return key
+    except Exception:
+        return key
 
 # DEBUG FIX - Force output to terminal
-import sys
+
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 sys.stderr.reconfigure(line_buffering=True) if hasattr(sys.stderr, 'reconfigure') else None
 
@@ -81,132 +86,20 @@ DEFAULT_CFG = {
     },
     "timer_minutes": 10,
     "enabled_images": {},  # NEW: per-image toggle (rel path -> bool)
+    "show_temperature_in_tray": False,  # Show temperature in AppIndicator
+    "weather_cache": {
+        "code": None,
+        "temp": None,
+        "timestamp": 0,
+        "lat": None,
+        "lon": None
+    },  # Cache for weather data to reduce API calls
 }
 
 APP_ID = "wallpaper-smart"
 APP_VERSION = "1.0.0"
 LOCALES_DIR = os.path.join(os.path.dirname(__file__), "locales")
 
-
-# Presets de géolocalisation (simulation météo)
-# Choisir un preset remplit Lat/Lon et force le mode "fixed" (sans sauvegarder tant que tu n'as pas cliqué Enregistrer).
-# GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
-#     "none": ("Aucun (mode normal)", None),
-
-#     # Europe
-#     "paris": ("Paris 🇫🇷", (48.8566, 2.3522)),
-#     "london": ("Londres 🇬🇧", (51.5074, -0.1278)),
-#     "berlin": ("Berlin 🇩🇪", (52.5200, 13.4050)),
-#     "madrid": ("Madrid 🇪🇸", (40.4168, -3.7038)),
-#     "rome": ("Rome 🇮🇹", (41.9028, 12.4964)),
-#     "amsterdam": ("Amsterdam 🇳🇱", (52.3676, 4.9041)),
-#     "brussels": ("Bruxelles 🇧🇪", (50.8503, 4.3517)),
-#     "vienna": ("Vienne 🇦🇹", (48.2082, 16.3738)),
-#     "prague": ("Prague 🇨🇿", (50.0755, 14.4378)),
-#     "warsaw": ("Varsovie 🇵🇱", (52.2297, 21.0122)),
-#     "stockholm": ("Stockholm 🇸🇪", (59.3293, 18.0686)),
-#     "oslo": ("Oslo 🇳🇴", (59.9139, 10.7522)),
-#     "helsinki": ("Helsinki 🇫🇮", (60.1699, 24.9384)),
-#     "copenhagen": ("Copenhague 🇩🇰", (55.6761, 12.5683)),
-#     "lisbon": ("Lisbonne 🇵🇹", (38.7223, -9.1393)),
-#     "athens": ("Athenes 🇬🇷", (37.9838, 23.7275)),
-#     "zurich": ("Zurich 🇨🇭", (47.3769, 8.5417)),
-#     "geneva": ("Geneve 🇨🇭", (46.2044, 6.1432)),
-#     "istanbul": ("Istanbul 🇹🇷", (41.0082, 28.9784)),
-#     "moscow": ("Moscou 🇷🇺", (55.7558, 37.6173)),
-#     "kazan": ("Kazan 🇷🇺", (55.7961, 49.1064)),
-#     "reykjavik": ("Reykjavik 🇮🇸", (64.1466, -21.9426)),
-
-#     # Amerique du Nord
-#     "new_york": ("New York 🇺🇸", (40.7128, -74.0060)),
-#     "los_angeles": ("Los Angeles 🇺🇸", (34.0522, -118.2437)),
-#     "san_francisco": ("San Francisco 🇺🇸", (37.7749, -122.4194)),
-#     "chicago": ("Chicago 🇺🇸", (41.8781, -87.6298)),
-#     "miami": ("Miami 🇺🇸", (25.7617, -80.1918)),
-#     "toronto": ("Toronto 🇨🇦", (43.6532, -79.3832)),
-#     "montreal": ("Montreal 🇨🇦", (45.5017, -73.5673)),
-#     "vancouver": ("Vancouver 🇨🇦", (49.2827, -123.1207)),
-#     "mexico_city": ("Mexico 🇲🇽", (19.4326, -99.1332)),
-
-#     # Amerique du Sud
-#     "sao_paulo": ("Sao Paulo 🇧🇷", (-23.5505, -46.6333)),
-#     "rio": ("Rio de Janeiro 🇧🇷", (-22.9068, -43.1729)),
-#     "buenos_aires": ("Buenos Aires 🇦🇷", (-34.6037, -58.3816)),
-#     "santiago": ("Santiago 🇨🇱", (-33.4489, -70.6693)),
-#     "lima": ("Lima 🇵🇪", (-12.0464, -77.0428)),
-#     "bogota": ("Bogota 🇨🇴", (4.7110, -74.0721)),
-
-#     # Afrique
-#     "casablanca": ("Casablanca 🇲🇦", (33.5731, -7.5898)),
-#     "rabat": ("Rabat 🇲🇦", (34.0209, -6.8416)),
-#     "algiers": ("Alger 🇩🇿", (36.7538, 3.0588)),
-#     "tunis": ("Tunis 🇹🇳", (36.8065, 10.1815)),
-#     "cairo": ("Le Caire 🇪🇬", (30.0444, 31.2357)),
-#     "lagos": ("Lagos 🇳🇬", (6.5244, 3.3792)),
-#     "nairobi": ("Nairobi 🇰🇪", (-1.2921, 36.8219)),
-#     "addis_ababa": ("Addis-Abeba 🇪🇹", (8.9806, 38.7578)),
-#     "johannesburg": ("Johannesburg 🇿🇦", (-26.2041, 28.0473)),
-#     "cape_town": ("Le Cap 🇿🇦", (-33.9249, 18.4241)),
-#     "dakar": ("Dakar 🇸🇳", (14.7167, -17.4677)),
-
-#     # Moyen-Orient
-#     "dubai": ("Dubai 🇦🇪", (25.2048, 55.2708)),
-#     "abu_dhabi": ("Abu Dhabi 🇦🇪", (24.4539, 54.3773)),
-#     "doha": ("Doha 🇶🇦", (25.2854, 51.5310)),
-#     "riyadh": ("Riyad 🇸🇦", (24.7136, 46.6753)),
-#     "jerusalem": ("Jerusalem 🇮🇱", (31.7683, 35.2137)),
-#     "tehran": ("Teheran 🇮🇷", (35.6892, 51.3890)),
-
-#     # Asie
-#     "tokyo": ("Tokyo 🇯🇵", (35.6762, 139.6503)),
-#     "osaka": ("Osaka 🇯🇵", (34.6937, 135.5023)),
-#     "seoul": ("Seoul 🇰🇷", (37.5665, 126.9780)),
-#     "beijing": ("Pekin 🇨🇳", (39.9042, 116.4074)),
-#     "shanghai": ("Shanghai 🇨🇳", (31.2304, 121.4737)),
-#     "hong_kong": ("Hong Kong 🇭🇰", (22.3193, 114.1694)),
-#     "taipei": ("Taipei 🇹🇼", (25.0330, 121.5654)),
-#     "singapore": ("Singapore 🇸🇬", (1.3521, 103.8198)),
-#     "bangkok": ("Bangkok 🇹🇭", (13.7563, 100.5018)),
-#     "kuala_lumpur": ("Kuala Lumpur 🇲🇾", (3.1390, 101.6869)),
-#     "jakarta": ("Jakarta 🇮🇩", (-6.2088, 106.8456)),
-#     "manila": ("Manille 🇵🇭", (14.5995, 120.9842)),
-#     "delhi": ("Delhi 🇮🇳", (28.6139, 77.2090)),
-#     "mumbai": ("Mumbai 🇮🇳", (19.0760, 72.8777)),
-#     "bengaluru": ("Bengaluru 🇮🇳", (12.9716, 77.5946)),
-
-#     # Oceanie
-#     "sydney": ("Sydney 🇦🇺", (-33.8688, 151.2093)),
-#     "melbourne": ("Melbourne 🇦🇺", (-37.8136, 144.9631)),
-#     "auckland": ("Auckland 🇳🇿", (-36.8485, 174.7633)),
-# }
-
-# GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
-#     "none": ("Aucun (mode normal)", None),
-
-#     "ae_dubai": ("🇦🇪 Dubai", (25.2048, 55.2708)),
-#     "au_sydney": ("🇦🇺 Sydney", (-33.8688, 151.2093)),
-#     "br_rio": ("🇧🇷 Rio de Janeiro", (-22.9068, -43.1729)),
-#     "ca_vancouver": ("🇨🇦 Vancouver", (49.2827, -123.1207)),
-#     "cn_beijing": ("🇨🇳 Pekin", (39.9042, 116.4074)),
-#     "eg_cairo": ("🇪🇬 Le Caire", (30.0444, 31.2357)),
-#     "fr_paris": ("🇫🇷 Paris", (48.8566, 2.3522)),
-#     "fr_strasbourg": ("🇫🇷 Strasbourg", (48.5734, 7.7521)),
-#     "gb_london": ("🇬🇧 Londres", (51.5074, -0.1278)),
-#     "id_jakarta": ("🇮🇩 Jakarta", (-6.2088, 106.8456)),
-#     "in_delhi": ("🇮🇳 Delhi", (28.6139, 77.2090)),
-#     "is_reykjavik": ("🇮🇸 Reykjavik", (64.1466, -21.9426)),
-#     "jp_tokyo": ("🇯🇵 Tokyo", (35.6762, 139.6503)),
-#     "ma_casablanca": ("🇲🇦 Casablanca", (33.5731, -7.5898)),
-#     "no_oslo": ("🇳🇴 Oslo", (59.9139, 10.7522)),
-#     "nl_amsterdam": ("🇳🇱 Amsterdam", (52.3676, 4.9041)),
-#     "ru_kazan": ("🇷🇺 Kazan", (55.7961, 49.1064)),
-#     "ru_moscow": ("🇷🇺 Moscou", (55.7558, 37.6173)),
-#     "sg_singapore": ("🇸🇬 Singapore", (1.3521, 103.8198)),
-#     "th_bangkok": ("🇹🇭 Bangkok", (13.7563, 100.5018)),
-#     "tr_istanbul": ("🇹🇷 Istanbul", (41.0082, 28.9784)),
-#     "us_los_angeles": ("🇺🇸 Los Angeles", (34.0522, -118.2437)),
-#     "us_new_york": ("🇺🇸 New York", (40.7128, -74.0060)),
-# }
 
 GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
     "none": ("Aucun (saisie perso)", None),
@@ -233,6 +126,9 @@ GEO_PRESETS: Dict[str, Tuple[str, Tuple[float, float] | None]] = {
 APP_LANG_DEFAULT = "en_GB"
 _tr = {}
 _tr_fallback = {}
+
+# Thread pool for async HTTP requests (avoid blocking GTK UI)
+_http_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="http-")
 
 def disable_scroll_change(widget):
     """
@@ -320,16 +216,6 @@ def init_i18n_json(cfg: dict, lang_dir: Path | None = None) -> None:
         _tr = dict(_tr_fallback)
 
 
-def _(key: str) -> str:
-    try:
-        if key in _tr:
-            return str(_tr[key])
-        if key in _tr_fallback:
-            return str(_tr_fallback[key])
-        return key
-    except Exception:
-        return key
-
 def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
     url = (
         "https://api.open-meteo.com/v1/forecast"
@@ -338,6 +224,21 @@ def fetch_weather_code(lat: float, lon: float, timeout: int = 3) -> int:
     d = _http_json(url, timeout=timeout)
     cur = d.get("current") or {}
     return int(cur.get("weather_code") or 0)
+
+
+def fetch_weather_with_temp(lat: float, lon: float, timeout: int = 3) -> Tuple[int, float]:
+    """Fetch weather code and temperature from Open-Meteo API.
+    Returns: (weather_code, temperature_celsius)
+    """
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}&current=weather_code,temperature_2m"
+    )
+    d = _http_json(url, timeout=timeout)
+    cur = d.get("current") or {}
+    code = int(cur.get("weather_code") or 0)
+    temp = float(cur.get("temperature_2m") or 0)
+    return code, temp
 
 
 def weather_code_to_bucket(code: int) -> str:
@@ -356,6 +257,52 @@ def weather_code_to_bucket(code: int) -> str:
         return "thunder"
     else:
         return "cloudy"  # fallback
+
+
+def is_weather_cache_valid(cfg: Dict, lat: float, lon: float, max_age_seconds: int = 600) -> bool:
+    """Vérifie si le cache météo est encore valide (moins de 10 minutes et même coordonnées)"""
+    import time
+    cache = cfg.get("weather_cache", {})
+    
+    if cache.get("code") is None or cache.get("temp") is None:
+        return False
+    
+    # Vérifier si les coordonnées correspondent
+    cached_lat = cache.get("lat")
+    cached_lon = cache.get("lon")
+    if cached_lat is None or cached_lon is None:
+        return False
+    if abs(cached_lat - lat) > 0.01 or abs(cached_lon - lon) > 0.01:
+        return False
+    
+    # Vérifier l'ancienneté du cache
+    timestamp = cache.get("timestamp", 0)
+    age = time.time() - timestamp
+    return age < max_age_seconds
+
+
+def update_weather_cache(cfg: Dict, code: int, temp: float, lat: float, lon: float):
+    """Met à jour le cache météo dans la config et sauvegarde dans le fichier"""
+    import time
+    cfg["weather_cache"] = {
+        "code": code,
+        "temp": temp,
+        "timestamp": time.time(),
+        "lat": lat,
+        "lon": lon
+    }
+    # Sauvegarder dans le fichier config
+    try:
+        with open(CFG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        debug_print(f"Erreur lors de la sauvegarde du cache météo: {e}")
+
+
+def get_cached_weather(cfg: Dict) -> Tuple[int | None, float | None]:
+    """Récupère les données météo depuis le cache"""
+    cache = cfg.get("weather_cache", {})
+    return cache.get("code"), cache.get("temp")
 
 
 def country_code_to_flag(country_code: str) -> str:
@@ -448,7 +395,7 @@ def load_wallpaper_themes(wallpaper_dir: str) -> List[Tuple[str, str]]:
 
 def _http_json(url: str, timeout: int = 5) -> Dict[str, Any]:
     """
-    Fetch JSON from URL with a hard timeout.
+    Fetch JSON from URL with a hard timeout (synchronous).
     Raises exceptions on HTTP/network/JSON errors.
     """
     req = urllib.request.Request(
@@ -474,6 +421,107 @@ def _http_json(url: str, timeout: int = 5) -> Dict[str, Any]:
     if not isinstance(obj, dict):
         raise RuntimeError(f"Expected JSON object, got {type(obj).__name__}")
     return obj
+
+
+def _http_json_async(url: str, callback, timeout: int = 5):
+    """
+    Fetch JSON from URL asynchronously using ThreadPoolExecutor.
+    Calls callback(result: Dict | None, error: str | None) on GTK main thread.
+    """
+    def _fetch():
+        try:
+            result = _http_json(url, timeout=timeout)
+            GLib.idle_add(lambda res=result: callback(res, None))
+        except Exception as e:
+            error_msg = str(e)
+            GLib.idle_add(lambda err=error_msg: callback(None, err))
+    
+    _http_executor.submit(_fetch)
+
+
+def fetch_weather_code_async(lat: float, lon: float, callback, timeout: int = 3):
+    """
+    Fetch weather code asynchronously.
+    Calls callback(code: int | None, error: str | None) on GTK main thread.
+    """
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}&current=weather_code"
+    )
+    
+    def _on_result(result, error):
+        if error:
+            callback(None, error)
+        else:
+            try:
+                cur = result.get("current") or {}
+                code = int(cur.get("weather_code") or 0)
+                callback(code, None)
+            except Exception as e:
+                callback(None, str(e))
+    
+    _http_json_async(url, _on_result, timeout=timeout)
+
+
+def fetch_weather_with_temp_async(lat: float, lon: float, callback, timeout: int = 3):
+    """
+    Fetch weather code and temperature asynchronously.
+    Calls callback(code: int | None, temp: float | None, error: str | None) on GTK main thread.
+    """
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}&current=weather_code,temperature_2m"
+    )
+    
+    def _on_result(result, error):
+        if error:
+            callback(None, None, error)
+        else:
+            try:
+                cur = result.get("current") or {}
+                code = int(cur.get("weather_code") or 0)
+                temp = float(cur.get("temperature_2m") or 0)
+                callback(code, temp, None)
+            except Exception as e:
+                callback(None, None, str(e))
+    
+    _http_json_async(url, _on_result, timeout=timeout)
+
+
+def geocode_city_async(city: str, callback, timeout: int = 6):
+    """
+    Geocode city asynchronously using Nominatim.
+    Calls callback(lat, lon, display, country_code, error) on GTK main thread.
+    """
+    def _fetch():
+        try:
+            result = geocode_city_nominatim(city, timeout=timeout)
+            GLib.idle_add(lambda res=result: callback(*res, None))
+        except Exception as e:
+            error_msg = str(e)
+            GLib.idle_add(lambda err=error_msg: callback(None, None, None, None, err))
+    
+    _http_executor.submit(_fetch)
+
+
+def auto_ip_details_async(callback):
+    """
+    Fetch IP-based geolocation asynchronously.
+    Calls callback(details: Dict, error: str | None) on GTK main thread.
+    """
+    def _fetch():
+        try:
+            result = _auto_ip_details()
+            if "_error" in result:
+                error_msg = result["_error"]
+                GLib.idle_add(lambda err=error_msg: callback({}, err))
+            else:
+                GLib.idle_add(lambda res=result: callback(res, None))
+        except Exception as e:
+            error_msg = str(e)
+            GLib.idle_add(lambda err=error_msg: callback({}, err))
+    
+    _http_executor.submit(_fetch)
 
 
 def geocode_city_nominatim(city: str, timeout: int = 6) -> Tuple[float, float, str, str]:
@@ -588,418 +636,126 @@ def _auto_ip_details() -> Dict[str, str | float]:
 
     
 def apply_css(dark: bool):
-    if dark:
-        css = b"""
-        * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
-
-        window { background: #2B2B2B; color: #EDEDED; }
-
-        /* Header discret */
-        .header {
-        padding: 12px 14px;
-        background: #2B2B2B;
-        border: 0;
-        }
-        .header-title { font-size: 16px; font-weight: 800; color: #EDEDED; }
-        .header-sub { font-size: 12px; color: rgba(237,237,237,0.60); }
-
-        /* Notebook type GNOME (soft) */
-        notebook { background: transparent; border: 0; }
-        notebook header { background: transparent; border: 0; }
-        notebook tab {
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 10px;
-        padding: 6px 12px;
-        margin: 6px 6px 10px 0;
-        }
-        notebook tab:checked {
-        background: rgba(255,255,255,0.10);
-        border-color: rgba(255,255,255,0.14);
-        }
-
-        /* Pages */
-        .page { padding: 10px; }
-
-        /* Cards (sombres, bord fin) */
-        .card {
-        background: #343434;
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 14px;
-        padding: 12px;
-        }
-        .card-title { font-size: 13px; font-weight: 800; color: #EDEDED; }
-        .muted { color: rgba(237,237,237,0.60); }
-
-        /* Inputs (text fields) */
-        entry, spinbutton entry {
-        background: rgba(255,255,255,0.06);
-        color: #EDEDED;
-        border: 1px solid rgba(255,255,255,0.14);
-        border-radius: 12px;
-        padding: 10px;
-        }
-        
-        /* Combobox (Mode / Preset) : style flat, pas de double bordure */
-        combobox {
-            background: transparent;
-            border: 0;
-        }
-        
-        /* La boite principale du combobox */
-        combobox box {
-            background: #4b4b4b;
-            color: #EDEDED;
-            border: 0;
-            border-radius: 999px;
-            padding: 10px 12px;
-            box-shadow: none;
-        }
-        
-        /* IMPORTANT : le combobox contient un button interne (fleche) -> on annule ton style global button */
-        combobox button {
-        background: transparent;
-        border: 0;
-        box-shadow: none;
-        padding: 0;
-        border-radius: 999px;
-        }
-
-        /* Hover / Focus leger (optionnel) */
-        combobox box:hover {
-        background: rgba(255,255,255,0.10);
-        }
-        combobox:focus-within box {
-        background: rgba(255,255,255,0.12);
-        box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.55); /* petit focus accent */
-        }
-
-        /* Buttons neutres */
-        button {
-        background: rgba(255,255,255,0.06);
-        color: #EDEDED;
-        border: 1px solid rgba(255,255,255,0.12);
-        border-radius: 999px;
-        padding: 8px 14px;
-        }
-        button:hover { background: rgba(255,255,255,0.10); }
-
-        /* Accent Ubuntu (orange) */
-        .accent {
-        background: #E95420;
-        border-color: transparent;
-        color: #FFFFFF;
-        font-weight: 800;
-        }
-        .accent:hover { background: #F06434; }
-
-        /* Secondaire */
-        .warn {
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.14);
-        color: #EDEDED;
-        font-weight: 700;
-        }
-        .warn:hover { background: rgba(255,255,255,0.12); }
-
-        /* Chips */
-        .chip {
-        border-radius: 999px;
-        padding: 2px 10px;
-        font-size: 12px;
-        font-weight: 700;
-        border: 1px solid rgba(255,255,255,0.14);
-        }
-        .chip-ok {
-        background: rgba(46, 204, 113, 0.18);
-        color: #D9F8E6;
-        border-color: rgba(46, 204, 113, 0.28);
-        }
-        .chip-miss {
-        background: rgba(231, 76, 60, 0.18);
-        color: #FFE2DD;
-        border-color: rgba(231, 76, 60, 0.28);
-        }
-
-
-
-
-        /* Actionbar */
-        .actionbar {
-        padding: 10px;
-        background: #2B2B2B;
-        border: 0;
-        }
-
-        /* Tabs GNOME-like + icons */
-        .tab-icon { opacity: 0.90; }
-        .tab-text { font-weight: 700; }
-        notebook tab:checked {
-            box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.90);
-        }
-        button:focus,
-        button:focus-visible {
-        outline: none;
-        box-shadow: none;
-        }
-
-        notebook tab:focus,
-        notebook tab:focus-visible {
-        outline: none;
-        box-shadow: none;
-        }
-
-        entry:focus,
-        entry:focus-visible,
-        spinbutton:focus,
-        spinbutton:focus-visible,
-        combobox:focus,
-        combobox:focus-visible {
-        outline: none;
-        box-shadow: none;
-        }
-        .ui-img-bx {
-        padding:15px
-        }
-
-        .base-row {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 12px;
-        }
-
-        .img-frame {
-        border-radius: 12px;
-        border: 5px solid rgba(255, 255, 255, 0.08);
-        padding: 20px 0 
-        }
-
-        .img-frame image {
-        border-radius: 12px;
-        }
-        .img-frame {
-            box-shadow: none;
-        }
-
-        .base-current {
-        border: 2px solid rgba(255, 160, 60, 0.9);
-        background: rgba(255, 160, 60, 0.10);
-        }
-
-        .meteo-current {
-        border-left: 4px solid #ff9f3a;
-        background: rgba(255, 159, 58, 0.08);
-        }
-
-        button.time-clear-btn,
-        button.time-clear-btn:hover,
-        button.time-clear-btn:active,
-        button.time-clear-btn:checked,
-        button.time-clear-btn:focus {
-            padding: 0 10px;
-            min-width: 28px;
-            min-height: 28px;
-
-            border-radius: 12px;
-            box-shadow: none;
-            background-clip: padding-box;
-        }
-
-
-        button.time-clear-btn:hover {
-            background-color: rgba(255, 255, 255, 0.08);
-        }
-
-        button.time-clear-btn:hover {
-            background-color: rgba(255, 80, 80, 0.18);
-        }
-
-        """
-    else:
-        css = b"""
-        * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
-
-        window {
-            background: #FAFAFA;
-            color: #2E3436;
-        }
-
-        /* Header discret */
-        .header {
-            padding: 12px 14px;
-            background: #F6F6F6;
-            border: 0;
-        }
-        .header-title {
-            font-size: 16px;
-            font-weight: 800;
-            color: #2E3436;
-        }
-        .header-sub {
-            font-size: 12px;
-            color: rgba(46,52,54,0.60);
-        }
-
-        /* Notebook type GNOME (soft) */
-        notebook { background: transparent; border: 0; }
-        notebook header { background: transparent; border: 0; }
-        notebook tab {
-            background: rgba(0,0,0,0.03);
-            border: 1px solid rgba(0,0,0,0.08);
-            border-radius: 10px;
-            padding: 6px 12px;
-            margin: 6px 6px 10px 0;
-        }
-        notebook tab:checked {
-            background: rgba(0,0,0,0.06);
-            border-color: rgba(0,0,0,0.12);
-            box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.85);
-        }
-
-        /* Pages */
-        .page { padding: 10px; }
-
-        /* Cards */
-        .card {
-            background: #FFFFFF;
-            border: 1px solid rgba(0,0,0,0.08);
-            border-radius: 14px;
-            padding: 12px;
-        }
-        .card-title {
-            font-size: 13px;
-            font-weight: 800;
-            color: #2E3436;
-        }
-        .muted {
-            color: rgba(46,52,54,0.60);
-        }
-
-        /* Inputs */
-        entry, spinbutton entry {
-            background: #FFFFFF;
-            color: #2E3436;
-            border: 1px solid rgba(0,0,0,0.14);
-            border-radius: 12px;
-            padding: 10px;
-        }
-
-        /* Combobox */
-        combobox {
-            background: transparent;
-            border: 0;
-        }
-        combobox box {
-            background: #FFFFFF;
-            color: #2E3436;
-            border: 1px solid rgba(0,0,0,0.14);
-            border-radius: 999px;
-            padding: 10px 12px;
-        }
-        combobox button {
-            background: transparent;
-            border: 0;
-            padding: 0;
-        }
-        combobox box:hover {
-            background: rgba(0,0,0,0.04);
-        }
-        combobox:focus-within box {
-            box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.45);
-        }
-
-        /* Buttons */
-        button {
-            background: rgba(0,0,0,0.03);
-            color: #2E3436;
-            border: 1px solid rgba(0,0,0,0.12);
-            border-radius: 999px;
-            padding: 8px 14px;
-        }
-        button:hover {
-            background: rgba(0,0,0,0.06);
-        }
-
-        /* Accent Ubuntu */
-        .accent {
-            background: #E95420;
-            border-color: transparent;
-            color: #FFFFFF;
-            font-weight: 800;
-        }
-        .accent:hover { background: #F06434; }
-
-        /* Secondaire */
-        .warn {
-            background: rgba(0,0,0,0.04);
-            border: 1px solid rgba(0,0,0,0.12);
-            color: #2E3436;
-            font-weight: 700;
-        }
-        .warn:hover { background: rgba(0,0,0,0.08); }
-
-        /* Chips */
-        .chip {
-            border-radius: 999px;
-            padding: 2px 10px;
-            font-size: 12px;
-            font-weight: 700;
-            border: 1px solid rgba(0,0,0,0.14);
-        }
-        .chip-ok {
-            background: rgba(46, 204, 113, 0.18);
-            color: #1E7E4A;
-            border-color: rgba(46, 204, 113, 0.28);
-        }
-        .chip-miss {
-            background: rgba(231, 76, 60, 0.18);
-            color: #8E2C20;
-            border-color: rgba(231, 76, 60, 0.28);
-        }
-
-        /* Actionbar */
-        .actionbar {
-            padding: 10px;
-            background: #F6F6F6;
-            border: 0;
-        }
-
-        /* Images & frames */
-        .ui-img-bx { padding: 15px; }
-
-        .base-row {
-            background: rgba(0,0,0,0.02);
-            border: 1px solid rgba(0,0,0,0.08);
-            border-radius: 12px;
-        }
-
-        .img-frame {
-            border-radius: 12px;
-            border: 5px solid rgba(0,0,0,0.06);
-            padding: 20px 0;
-        }
-        .img-frame image { border-radius: 12px; }
-
-        .base-current {
-            border: 2px solid rgba(255, 160, 60, 0.9);
-            background: rgba(255, 160, 60, 0.12);
-        }
-
-        .meteo-current {
-            border-left: 4px solid #ff9f3a;
-            background: rgba(255, 159, 58, 0.10);
-        }
-        """
-
-
-
+    """
+    Load CSS from external files (style-dark.css or style-light.css).
+    Falls back to embedded CSS if files don't exist.
+    """
+    css_filename = "style-dark.css" if dark else "style-light.css"
+    css_path = APP_DIR / "css" / css_filename
+    
     provider = Gtk.CssProvider()
-    provider.load_from_data(css)
+    
+    # Try to load from external file first
+    if css_path.exists():
+        try:
+            provider.load_from_path(str(css_path))
+            debug_print(f"CSS chargé depuis: {css_path}")
+        except Exception as e:
+            debug_print(f"Erreur chargement CSS externe: {e}, fallback sur CSS embarqué")
+            # Fallback to embedded CSS
+            css = _get_embedded_css(dark)
+            provider.load_from_data(css)
+    else:
+        debug_print(f"Fichier CSS {css_path} introuvable, utilisation du CSS embarqué")
+        # Use embedded CSS as fallback
+        css = _get_embedded_css(dark)
+        provider.load_from_data(css)
+    
     Gtk.StyleContext.add_provider_for_screen(
         Gdk.Screen.get_default(),
         provider,
         Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
     )
+
+
+def _get_embedded_css(dark: bool) -> bytes:
+    """
+    Return embedded CSS as fallback when external files are not available.
+    This is kept for backwards compatibility.
+    """
+    if dark:
+        return b"""
+        * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
+        window { background: #2B2B2B; color: #EDEDED; }
+        .header { padding: 12px 14px; background: #2B2B2B; border: 0; }
+        .header-title { font-size: 16px; font-weight: 800; color: #EDEDED; }
+        .header-sub { font-size: 12px; color: rgba(237,237,237,0.60); }
+        notebook { background: transparent; border: 0; }
+        notebook header { background: transparent; border: 0; }
+        notebook tab { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; padding: 6px 12px; margin: 6px 6px 10px 0; }
+        notebook tab:checked { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.14); box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.90); }
+        .page { padding: 10px; }
+        .card { background: #343434; border: 1px solid rgba(255,255,255,0.10); border-radius: 14px; padding: 12px; }
+        .card-title { font-size: 13px; font-weight: 800; color: #EDEDED; }
+        .muted { color: rgba(237,237,237,0.60); }
+        entry, spinbutton entry { background: rgba(255,255,255,0.06); color: #EDEDED; border: 1px solid rgba(255,255,255,0.14); border-radius: 12px; padding: 10px; }
+        combobox { background: transparent; border: 0; }
+        combobox box { background: #4b4b4b; color: #EDEDED; border: 0; border-radius: 999px; padding: 10px 12px; box-shadow: none; }
+        combobox button { background: transparent; border: 0; box-shadow: none; padding: 0; border-radius: 999px; }
+        combobox box:hover { background: rgba(255,255,255,0.10); }
+        combobox:focus-within box { background: rgba(255,255,255,0.12); box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.55); }
+        button { background: rgba(255,255,255,0.06); color: #EDEDED; border: 1px solid rgba(255,255,255,0.12); border-radius: 999px; padding: 8px 14px; }
+        button:hover { background: rgba(255,255,255,0.10); }
+        .accent { background: #E95420; border-color: transparent; color: #FFFFFF; font-weight: 800; }
+        .accent:hover { background: #F06434; }
+        .warn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); color: #EDEDED; font-weight: 700; }
+        .warn:hover { background: rgba(255,255,255,0.12); }
+        .chip { border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; border: 1px solid rgba(255,255,255,0.14); }
+        .chip-ok { background: rgba(46, 204, 113, 0.18); color: #D9F8E6; border-color: rgba(46, 204, 113, 0.28); }
+        .chip-miss { background: rgba(231, 76, 60, 0.18); color: #FFE2DD; border-color: rgba(231, 76, 60, 0.28); }
+        .actionbar { padding: 10px; background: #2B2B2B; border: 0; }
+        .tab-icon { opacity: 0.90; }
+        .tab-text { font-weight: 700; }
+        button:focus, button:focus-visible { outline: none; box-shadow: none; }
+        notebook tab:focus, notebook tab:focus-visible { outline: none; box-shadow: none; }
+        entry:focus, entry:focus-visible, spinbutton:focus, spinbutton:focus-visible, combobox:focus, combobox:focus-visible { outline: none; box-shadow: none; }
+        .ui-img-bx { padding:15px }
+        .base-row { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; }
+        .img-frame { border-radius: 12px; border: 5px solid rgba(255, 255, 255, 0.08); padding: 20px 0; box-shadow: none; }
+        .img-frame image { border-radius: 12px; }
+        .base-current { border: 2px solid rgba(255, 160, 60, 0.9); background: rgba(255, 160, 60, 0.10); }
+        .meteo-current { border-left: 4px solid #ff9f3a; background: rgba(255, 159, 58, 0.08); }
+        button.time-clear-btn, button.time-clear-btn:hover, button.time-clear-btn:active, button.time-clear-btn:checked, button.time-clear-btn:focus { padding: 0 10px; min-width: 28px; min-height: 28px; border-radius: 12px; box-shadow: none; background-clip: padding-box; }
+        button.time-clear-btn:hover { background-color: rgba(255, 80, 80, 0.18); }
+        """
+    else:
+        return b"""
+        * { font-family: Cantarell, Inter, Sans; font-size: 14px; }
+        window { background: #FAFAFA; color: #2E3436; }
+        .header { padding: 12px 14px; background: #F6F6F6; border: 0; }
+        .header-title { font-size: 16px; font-weight: 800; color: #2E3436; }
+        .header-sub { font-size: 12px; color: rgba(46,52,54,0.60); }
+        notebook { background: transparent; border: 0; }
+        notebook header { background: transparent; border: 0; }
+        notebook tab { background: rgba(0,0,0,0.03); border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; padding: 6px 12px; margin: 6px 6px 10px 0; }
+        notebook tab:checked { background: rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); box-shadow: inset 0 -3px 0 0 rgba(233, 84, 32, 0.85); }
+        .page { padding: 10px; }
+        .card { background: #FFFFFF; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 12px; }
+        .card-title { font-size: 13px; font-weight: 800; color: #2E3436; }
+        .muted { color: rgba(46,52,54,0.60); }
+        entry, spinbutton entry { background: #FFFFFF; color: #2E3436; border: 1px solid rgba(0,0,0,0.14); border-radius: 12px; padding: 10px; }
+        combobox { background: transparent; border: 0; }
+        combobox box { background: #FFFFFF; color: #2E3436; border: 1px solid rgba(0,0,0,0.14); border-radius: 999px; padding: 10px 12px; }
+        combobox button { background: transparent; border: 0; padding: 0; }
+        combobox box:hover { background: rgba(0,0,0,0.04); }
+        combobox:focus-within box { box-shadow: inset 0 0 0 2px rgba(233, 84, 32, 0.45); }
+        button { background: rgba(0,0,0,0.03); color: #2E3436; border: 1px solid rgba(0,0,0,0.12); border-radius: 999px; padding: 8px 14px; }
+        button:hover { background: rgba(0,0,0,0.06); }
+        .accent { background: #E95420; border-color: transparent; color: #FFFFFF; font-weight: 800; }
+        .accent:hover { background: #F06434; }
+        .warn { background: rgba(0,0,0,0.04); border: 1px solid rgba(0,0,0,0.12); color: #2E3436; font-weight: 700; }
+        .warn:hover { background: rgba(0,0,0,0.08); }
+        .chip { border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; border: 1px solid rgba(0,0,0,0.14); }
+        .chip-ok { background: rgba(46, 204, 113, 0.18); color: #1E7E4A; border-color: rgba(46, 204, 113, 0.28); }
+        .chip-miss { background: rgba(231, 76, 60, 0.18); color: #8E2C20; border-color: rgba(231, 76, 60, 0.28); }
+        .actionbar { padding: 10px; background: #F6F6F6; border: 0; }
+        .ui-img-bx { padding: 15px; }
+        .base-row { background: rgba(0,0,0,0.02); border: 1px solid rgba(0,0,0,0.08); border-radius: 12px; }
+        .img-frame { border-radius: 12px; border: 5px solid rgba(0,0,0,0.06); padding: 20px 0; }
+        .img-frame image { border-radius: 12px; }
+        .base-current { border: 2px solid rgba(255, 160, 60, 0.9); background: rgba(255, 160, 60, 0.12); }
+        .meteo-current { border-left: 4px solid #ff9f3a; background: rgba(255, 159, 58, 0.10); }
+        """
 
 def migrate_enabled_images(cfg: dict) -> None:
     enabled = cfg.get("enabled_images")
@@ -1246,6 +1002,38 @@ def set_timer(enabled: bool):
     else:
         run(["systemctl", "--user", "disable", "--now", TIMER], check=True)
 
+def is_autostart_enabled():
+    """Check if autostart is enabled"""
+    autostart_dir = Path.home() / ".config" / "autostart"
+    autostart_file = autostart_dir / "wallpaper-smart-ui.desktop"
+    return autostart_file.exists()
+
+def set_autostart(enabled: bool):
+    """Enable or disable autostart"""
+    autostart_dir = Path.home() / ".config" / "autostart"
+    autostart_file = autostart_dir / "wallpaper-smart-ui.desktop"
+
+    if enabled:
+        # Create autostart directory if it doesn't exist
+        autostart_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create .desktop file
+        desktop_content = f"""[Desktop Entry]
+Type=Application
+Name=Wallpaper Smart UI
+Comment=Smart dynamic wallpaper manager
+Exec={Path.home() / ".local" / "bin" / "wallpaper-smart-ui"}
+Icon=preferences-desktop-wallpaper
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true
+"""
+        autostart_file.write_text(desktop_content, encoding="utf-8")
+    else:
+        # Remove autostart file if it exists
+        if autostart_file.exists():
+            autostart_file.unlink()
+
 def pick_file(parent, title, initial_dir: Path):
     dlg = Gtk.FileChooserDialog(
         title=title,
@@ -1480,17 +1268,34 @@ class App(Gtk.Window):
                 self.city_entry.grab_focus()
                 return
 
-            lat, lon, display, country_code = geocode_city_nominatim(city, timeout=6)
-            self.lat_entry.set_text(f"{lat:.4f}")
-            self.lon_entry.set_text(f"{lon:.4f}")
+            # Show loading state
+            original_text = self.city_entry.get_text()
+            self.city_entry.set_text(_("Recherche..."))
+            self.city_entry.set_sensitive(False)
 
-            # Optional: replace by normalized label with flag
-            if display:
-                flag = country_code_to_flag(country_code)
-                display_with_flag = f"{flag} {display}".strip() if flag else display
-                self.city_entry.set_text(display_with_flag)
+            def on_result(lat, lon, display, country_code, error):
+                self.city_entry.set_sensitive(True)
+                if error:
+                    self.city_entry.set_text(original_text)
+                    self.message(_("Erreur recherche ville"), error)
+                    try:
+                        self.city_entry.grab_focus()
+                    except Exception:
+                        pass
+                else:
+                    self.lat_entry.set_text(f"{lat:.4f}")
+                    self.lon_entry.set_text(f"{lon:.4f}")
 
-            self.city_entry.grab_focus()
+                    # Optional: replace by normalized label with flag
+                    if display:
+                        flag = country_code_to_flag(country_code)
+                        display_with_flag = f"{flag} {display}".strip() if flag else display
+                        self.city_entry.set_text(display_with_flag)
+
+                    self.city_entry.grab_focus()
+
+            geocode_city_async(city, on_result, timeout=6)
+
         except Exception as e:
             self.message(_("Erreur recherche ville"), str(e))
             try:
@@ -1652,8 +1457,61 @@ class App(Gtk.Window):
             # Rafraîchir la météo toutes les 10 minutes (600000 ms)
             GLib.timeout_add(600000, self._update_indicator_weather)
 
+            # Surveiller current.json pour mettre à jour l'indicateur quand le fond d'écran change
+            self._setup_wallpaper_monitor()
+
         except Exception as e:
             debug_print(f"Erreur lors de la création de l'indicateur: {e}")
+    
+    def _setup_wallpaper_monitor(self):
+        """Surveille le fichier current.json pour mettre à jour l'indicateur quand le fond d'écran change"""
+        try:
+            wallpaper_dir = self.cfg.get("wallpaper_dir", str(Path.home() / ".config/wallpaper-smart/wallpaper"))
+            current_json_path = Path(wallpaper_dir) / "current.json"
+            
+            if not current_json_path.parent.exists():
+                current_json_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Créer le fichier s'il n'existe pas
+            if not current_json_path.exists():
+                current_json_path.write_text("{}")
+            
+            # Créer un FileMonitor pour surveiller les modifications
+            gfile = Gio.File.new_for_path(str(current_json_path))
+            monitor = gfile.monitor_file(Gio.FileMonitorFlags.NONE, None)
+            
+            # Stocker le timestamp de la dernière mise à jour
+            self._last_wallpaper_update = 0
+            
+            def on_file_changed(monitor, file, other_file, event_type):
+                """Callback appelé quand current.json change"""
+                try:
+                    if event_type == Gio.FileMonitorEvent.CHANGED or event_type == Gio.FileMonitorEvent.CREATED:
+                        # Vérifier le timestamp pour éviter les mises à jour en boucle
+                        try:
+                            stat = current_json_path.stat()
+                            if stat.st_mtime != self._last_wallpaper_update:
+                                self._last_wallpaper_update = stat.st_mtime
+                                debug_print("current.json modifié, mise à jour de l'indicateur")
+                                # Mettre à jour l'indicateur avec un léger délai
+                                GLib.timeout_add(500, lambda: (self._update_indicator_weather(), False)[1])
+                                # Mettre à jour le dashboard si la fenêtre est visible
+                                if self.get_visible() and hasattr(self, 'refresh_dashboard'):
+                                    GLib.timeout_add(600, lambda: (self.refresh_dashboard(), False)[1])
+                        except Exception:
+                            pass
+                except Exception as e:
+                    debug_print(f"Erreur dans on_file_changed: {e}")
+            
+            monitor.connect("changed", on_file_changed)
+            
+            # Garder une référence au monitor pour éviter qu'il soit garbage collected
+            self._wallpaper_monitor = monitor
+            
+            debug_print(f"Surveillance activée sur: {current_json_path}")
+            
+        except Exception as e:
+            debug_print(f"Erreur lors de la configuration de la surveillance du fond d'écran: {e}")
     
     def _create_indicator_menu(self):
         """Crée le menu contextuel de l'indicateur"""
@@ -1728,7 +1586,9 @@ class App(Gtk.Window):
         Gtk.main_quit()
 
     def _get_current_coordinates(self):
-        """Récupère les coordonnées actuelles basées sur le mode de géolocalisation"""
+        """Récupère les coordonnées actuelles basées sur le mode de géolocalisation
+        Returns: (lat, lon, city, country_code)
+        """
         try:
             geo = self.cfg.get("geolocation", {})
             mode = geo.get("mode", "auto_ip")
@@ -1738,8 +1598,9 @@ class App(Gtk.Window):
                 lat = fixed.get("lat")
                 lon = fixed.get("lon")
                 city = geo.get("city_name", "")
+                country_code = geo.get("country_code", "")
                 if lat is not None and lon is not None:
-                    return float(lat), float(lon), city
+                    return float(lat), float(lon), city, country_code
             elif mode == "auto_ip":
                 # Récupérer via IP
                 details = _auto_ip_details()
@@ -1747,6 +1608,7 @@ class App(Gtk.Window):
                     lat = details["lat"]
                     lon = details["lon"]
                     city = details.get("city", geo.get("city_name", ""))
+                    country_code = details.get("country_code", "")
 
                     # Sauvegarder les coordonnées réussies pour usage futur
                     try:
@@ -1754,12 +1616,13 @@ class App(Gtk.Window):
                         geo["last_known_coordinates"]["lat"] = lat
                         geo["last_known_coordinates"]["lon"] = lon
                         geo["last_known_coordinates"]["city"] = city
+                        geo["last_known_coordinates"]["country_code"] = country_code
                         save_cfg(self.cfg)
-                        debug_print(f"Coordonnées sauvegardées: lat={lat}, lon={lon}, city={city}")
+                        debug_print(f"Coordonnées sauvegardées: lat={lat}, lon={lon}, city={city}, country={country_code}")
                     except Exception as save_err:
                         debug_print(f"Erreur lors de la sauvegarde des coordonnées: {save_err}")
 
-                    return float(lat), float(lon), str(city)
+                    return float(lat), float(lon), str(city), str(country_code)
                 else:
                     # Fallback 1: Essayer les dernières coordonnées connues
                     last_known = geo.get("last_known_coordinates", {})
@@ -1767,8 +1630,9 @@ class App(Gtk.Window):
                         lat = last_known["lat"]
                         lon = last_known["lon"]
                         city = last_known.get("city", "")
+                        country_code = last_known.get("country_code", "")
                         debug_print(f"Utilisation des dernières coordonnées connues: lat={lat}, lon={lon}, city={city}")
-                        return float(lat), float(lon), str(city)
+                        return float(lat), float(lon), str(city), str(country_code)
 
                     # Fallback 2: Essayer les coordonnées fixes si disponibles
                     fixed = geo.get("fixed", {})
@@ -1776,63 +1640,102 @@ class App(Gtk.Window):
                         lat = fixed["lat"]
                         lon = fixed["lon"]
                         city = geo.get("city_name", "")
+                        country_code = geo.get("country_code", "")
                         debug_print(f"Utilisation des coordonnées fixes comme fallback: lat={lat}, lon={lon}, city={city}")
-                        return float(lat), float(lon), str(city)
+                        return float(lat), float(lon), str(city), str(country_code)
 
             # Fallback sur les coordonnées par défaut
-            return None, None, ""
+            return None, None, "", ""
         except Exception as e:
             debug_print(f"Erreur lors de la récupération des coordonnées: {e}")
-            return None, None, ""
+            return None, None, "", ""
 
     def _update_indicator_weather(self):
         """Met à jour le label de l'indicateur avec la météo actuelle"""
         try:
-            debug_print("=== _update_indicator_weather appelé ===")
-
             if not HAS_APPINDICATOR or not self.indicator:
-                debug_print("AppIndicator non disponible ou indicateur non créé")
                 return True
 
             # Vérifier que la config est chargée
             if not hasattr(self, 'cfg'):
-                debug_print("Config pas encore chargée")
                 return True
 
             # Récupérer les coordonnées
-            lat, lon, city = self._get_current_coordinates()
-            debug_print(f"Coordonnées récupérées: lat={lat}, lon={lon}, city={city}")
+            lat, lon, city, country_code = self._get_current_coordinates()
 
             if lat is None or lon is None:
                 # Pas de coordonnées disponibles
-                debug_print("Pas de coordonnées disponibles, on vide le label")
                 self.indicator.set_label("", "")
                 return True
 
-            # Récupérer le code météo
-            code = fetch_weather_code(lat, lon, timeout=5)
-            debug_print(f"Code météo récupéré: {code}")
+            # Générer le drapeau
+            flag = country_code_to_flag(country_code) if country_code else ""
 
-            # Convertir en bucket
-            bucket = weather_code_to_bucket(code)
-            debug_print(f"Bucket: {bucket}")
+            # Fonction pour mettre à jour l'affichage avec les données météo
+            def update_display(code, temp):
+                try:
+                    # Convertir en bucket
+                    bucket = weather_code_to_bucket(code)
 
-            # Récupérer l'emoji et le nom
-            meteo_txt, emoji = BUCKET_LABELS.get(bucket, (bucket, "🌡️"))
-            debug_print(f"Météo: {meteo_txt}, emoji: {emoji}")
+                    # Récupérer l'emoji et le nom
+                    meteo_txt, emoji = BUCKET_LABELS.get(bucket, (bucket, "🌡️"))
 
-            # Construire le label
-            if city:
-                label = f"{emoji} {city}"
+                    # Vérifier si on doit afficher la température
+                    show_temp = self.cfg.get("show_temperature_in_tray", False)
+
+                    # Construire le label
+                    if show_temp and temp is not None:
+                        temp_str = f"{temp:.0f}°C"
+                        if city:
+                            label = f"{temp_str} {emoji} {flag} {city}".strip()
+                        else:
+                            label = f"{temp_str} {emoji} {meteo_txt}".strip()
+                    else:
+                        if city:
+                            label = f"{emoji} {flag} {city}".strip()
+                        else:
+                            label = f"{emoji} {meteo_txt}".strip()
+
+                    # Mettre à jour l'indicateur
+                    self.indicator.set_label(label, label)
+                    self.indicator.set_title(label)
+                except Exception as e:
+                    debug_print(f"Erreur lors de la mise à jour du label: {e}")
+
+            # Vérifier si le cache est valide (moins de 10 minutes)
+            if is_weather_cache_valid(self.cfg, lat, lon, max_age_seconds=600):
+                # Utiliser les données du cache
+                cached_code, cached_temp = get_cached_weather(self.cfg)
+                if cached_code is not None:
+                    debug_print("Utilisation du cache météo")
+                    update_display(cached_code, cached_temp)
             else:
-                label = f"{emoji} {meteo_txt}"
+                # Le cache n'est pas valide, faire un appel API
+                debug_print("Cache météo invalide, appel API")
+                
+                def on_weather_result(code, temp, error):
+                    if error:
+                        debug_print(f"Erreur météo dans indicateur: {error}")
+                        # En cas d'erreur, essayer d'utiliser le cache même s'il est ancien
+                        cached_code, cached_temp = get_cached_weather(self.cfg)
+                        if cached_code is not None:
+                            debug_print("Utilisation du cache périmé en raison d'une erreur API")
+                            update_display(cached_code, cached_temp)
+                        return
+                    
+                    try:
+                        # Mettre à jour le cache avec les nouvelles données
+                        update_weather_cache(self.cfg, code, temp, lat, lon)
+                        debug_print(f"Cache météo mis à jour: code={code}, temp={temp}°C")
+                        
+                        # Mettre à jour l'affichage
+                        update_display(code, temp)
+                    except Exception as e:
+                        debug_print(f"Erreur lors de la mise à jour: {e}")
 
-            debug_print(f"Label final: '{label}'")
-
-            # Mettre à jour l'indicateur (utiliser à la fois label et title pour compatibilité)
-            self.indicator.set_label(label, label)
-            self.indicator.set_title(label)
-            debug_print("Label et titre mis à jour avec succès")
+                # Toujours récupérer la température même si show_temperature_in_tray est False
+                # Cela permet d'avoir les données en cache pour plus tard
+                fetch_weather_with_temp_async(lat, lon, on_weather_result, timeout=5)
 
         except Exception as e:
             debug_print(f"Erreur lors de la mise à jour de la météo: {e}")
@@ -1869,7 +1772,7 @@ class App(Gtk.Window):
     def build_tab_general(self):
         # Dashboard + dossier
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        
+
         # --- Dashboard (état) ---
         self.dashboard_card = self.build_dashboard_card()
         page.pack_start(self.dashboard_card, False, False, 0)
@@ -1878,14 +1781,88 @@ class App(Gtk.Window):
         #self.wall_theme_card = self.build_wallpaper_theme_card()
         #page.pack_start(self.wall_theme_card, False, False, 0)
 
+        # --- Temperature in tray ---
+        if HAS_APPINDICATOR:
+            self.temperature_tray_card = self.build_temperature_tray_card()
+            page.pack_start(self.temperature_tray_card, False, False, 0)
+
+        # --- Autostart ---
+        self.autostart_card = self.build_autostart_card()
+        page.pack_start(self.autostart_card, False, False, 0)
+
         # --- Langue ---
         self.language_card = self.build_language_card()
         page.pack_start(self.language_card, False, False, 0)
-        
+
 
         # Refresh dashboard once UI is built
         # self.refresh_dashboard()
         return make_page(page)
+
+    def build_temperature_tray_card(self):
+        """Build card for temperature display in AppIndicator."""
+        content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+
+        # Label
+        lbl = Gtk.Label(label=_("Afficher la température dans la barre système"), xalign=0)
+        content.pack_start(lbl, True, True, 0)
+
+        # Switch
+        self.temperature_tray_switch = Gtk.Switch()
+        current_state = self.cfg.get("show_temperature_in_tray", False)
+        self.temperature_tray_switch.set_active(current_state)
+        self.temperature_tray_switch.connect("notify::active", self.on_temperature_tray_toggled)
+        content.pack_start(self.temperature_tray_switch, False, False, 0)
+
+        return make_card(_("Température dans la barre système"), content)
+
+    def on_temperature_tray_toggled(self, switch, _gparam):
+        """Handle temperature tray switch toggle."""
+        enabled = switch.get_active()
+        self.cfg["show_temperature_in_tray"] = enabled
+        
+        # Update indicator immediately if it exists
+        if HAS_APPINDICATOR and hasattr(self, 'indicator') and self.indicator:
+            # Trigger weather update to reflect new setting (execute once, return False)
+            GLib.idle_add(lambda: (self._update_indicator_weather(), False)[1])
+
+    def build_autostart_card(self):
+        content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+
+        # Label
+        lbl = Gtk.Label(label=_("tab.setting.autostart-card.lbl"), xalign=0)
+        content.pack_start(lbl, True, True, 0)
+
+        # Switch
+        self.autostart_switch = Gtk.Switch()
+        self.autostart_switch.set_active(is_autostart_enabled())
+        self.autostart_switch.connect("notify::active", self.on_autostart_toggled)
+        content.pack_start(self.autostart_switch, False, False, 0)
+
+        return make_card(_("tab.setting.autostart-card.title"), content)
+
+    def on_autostart_toggled(self, switch, _gparam):
+        enabled = switch.get_active()
+        try:
+            set_autostart(enabled)
+            if enabled:
+                self.message(
+                    _("tab.setting.autostart-card.enabled-msg"),
+                    _("tab.setting.autostart-card.enabled-hint")
+                )
+            else:
+                self.message(
+                    _("tab.setting.autostart-card.disabled-msg"),
+                    _("tab.setting.autostart-card.disabled-hint")
+                )
+        except Exception as e:
+            debug_print(f"Error toggling autostart: {e}")
+            # Revert switch state on error
+            switch.set_active(not enabled)
+            self.message(
+                _("tab.setting.autostart-card.error-msg"),
+                str(e)
+            )
 
     def build_language_card(self):
         content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -3823,7 +3800,13 @@ class App(Gtk.Window):
         self.btn_toggle.set_label(_("btn.tolggle.off") if is_timer_active() else _("btn.tolggle.on"))
 
     def message(self, title, text):
-        dlg = Gtk.MessageDialog(self, 0, Gtk.MessageType.INFO, Gtk.ButtonsType.OK, title)
+        dlg = Gtk.MessageDialog(
+            parent=self,
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text=title
+        )
         dlg.format_secondary_text(text)
         dlg.set_default_size(860, 480)
         dlg.run()
@@ -3971,9 +3954,15 @@ class App(Gtk.Window):
     def _fill_from_auto_ip(self):
         """Remplit Lat/Lon/Ville depuis l'IP (UI uniquement, sans sauvegarde)."""
         try:
-            self.lat_entry.set_text("")
-            self.lon_entry.set_text("")
-            self.city_entry.set_text("")
+            # Show loading state
+            self.lat_entry.set_text(_("Chargement..."))
+            self.lon_entry.set_text(_("Chargement..."))
+            self.city_entry.set_text(_("Detection..."))
+            
+            # Disable inputs during loading
+            self.lat_entry.set_sensitive(False)
+            self.lon_entry.set_sensitive(False)
+            self.city_entry.set_sensitive(False)
 
             if hasattr(self, "_hid_preset_changed"):
                 self.preset_combo.handler_block(self._hid_preset_changed)
@@ -3983,53 +3972,57 @@ class App(Gtk.Window):
             if hasattr(self, "_hid_preset_changed"):
                 self.preset_combo.handler_unblock(self._hid_preset_changed)
 
-            d = _auto_ip_details()
+            def on_result(d, error):
+                # Re-enable inputs
+                self.lat_entry.set_sensitive(True)
+                self.lon_entry.set_sensitive(True)
+                self.city_entry.set_sensitive(True)
+                
+                if error or not isinstance(d, dict) or ("lat" not in d) or ("lon" not in d):
+                    # Clear fields on error
+                    self.lat_entry.set_text("")
+                    self.lon_entry.set_text("")
+                    self.city_entry.set_text("")
+                    
+                    err_txt = error if error else _("Service indisponible")
+
+                    self.message(
+                        "Geoloc auto indisponible",
+                        "Impossible de recuperer ta localisation automatiquement (auto_ip).\\n\\n"
+                        "Cause probable: limite temporaire du service.\\n"
+                        "Attends 1-2 minutes puis reessaie.\\n\\n"
+                        "Astuce: utilise un preset ou passe en mode fixed.\\n\\n"
+                        f"Details: {err_txt}"
+                    )
+                    return
+
+                if "lat" in d and hasattr(self, "lat_entry"):
+                    self.lat_entry.set_text(f"{d['lat']:.4f}")
+                if "lon" in d and hasattr(self, "lon_entry"):
+                    self.lon_entry.set_text(f"{d['lon']:.4f}")
+                
+                if hasattr(self, "city_entry"):
+                    city = str(d.get("city") or "").strip()
+                    region = str(d.get("region") or "").strip()
+                    country = str(d.get("country") or "").strip()
+                    country_code = str(d.get("country_code") or "").strip()
+
+                    label = city
+                    if region and region not in label:
+                        label = (label + f", {region}") if label else region
+                    if country and country not in label:
+                        label = (label + f", {country}") if label else country
+
+                    # Ajouter le drapeau au début
+                    if label:
+                        flag = country_code_to_flag(country_code)
+                        label_with_flag = f"{flag} {label}".strip() if flag else label
+                        self.city_entry.set_text(label_with_flag)
             
-            # si auto-ip failed
-            if not isinstance(d, dict) or ("lat" not in d) or ("lon" not in d):
-                err_txt = ""
-                if isinstance(d, dict):
-                    err_txt = str(d.get("_error", "")).strip()
-
-                # fallback au cas ou err_txt vide
-                if not err_txt:
-                    err_txt = _("Service indisponible")
-
-                self.message(
-                    "Geoloc auto indisponible",
-                    "Impossible de recuperer ta localisation automatiquement (auto_ip).\n\n"
-                    "Cause probable: limite temporaire du service.\n"
-                    "Attends 1-2 minutes puis reessaie.\n\n"
-                    "Astuce: utilise un preset ou passe en mode fixed.\n\n"
-                    f"Details: {err_txt}"
-                )
-                return
-
-
-            if "lat" in d and hasattr(self, "lat_entry"):
-                self.lat_entry.set_text(f"{d['lat']:.4f}")
-            if "lon" in d and hasattr(self, "lon_entry"):
-                self.lon_entry.set_text(f"{d['lon']:.4f}")
+            auto_ip_details_async(on_result)
             
-            if hasattr(self, "city_entry"):
-                city = str(d.get("city") or "").strip()
-                region = str(d.get("region") or "").strip()
-                country = str(d.get("country") or "").strip()
-                country_code = str(d.get("country_code") or "").strip()
-
-                label = city
-                if region and region not in label:
-                    label = (label + f", {region}") if label else region
-                if country and country not in label:
-                    label = (label + f", {country}") if label else country
-
-                # Ajouter le drapeau au début
-                if label:
-                    flag = country_code_to_flag(country_code)
-                    label_with_flag = f"{flag} {label}".strip() if flag else label
-                    self.city_entry.set_text(label_with_flag)
-        except Exception:
-            pass
+        except Exception as e:
+            debug_print(f"Erreur dans _fill_from_auto_ip: {e}")
 
     def on_geo_mode_changed(self, _combo):
         """When user changes mode, adjust UI and preset."""
@@ -4286,27 +4279,27 @@ class App(Gtk.Window):
 
             # --- Highlight current weather ---
             # row = self.meteo_rows.get(rel)
-            # if row:
-            #     row_ctx = row.get_style_context()
-            #     row_ctx.remove_class("meteo-current")
+        # if row:
+        #     row_ctx = row.get_style_context()
+        #     row_ctx.remove_class("meteo-current")
 
-            #     highlight_key = active_meteo or (self.weather_value and self.weather_value in rel)
-            #     # print(f"active_meteo: {active_meteo}")
-            #     # print(f"highlight_key: {highlight_key}")
-            #     # print(f"weather_value: {self.weather_value}")
-            #     # print(f"rel: {rel}")
-            #     # print("-------------------------------------------")
-            #     if(active_meteo is not None and active_meteo in rel):
-            #         row_ctx.add_class("meteo-current")
-            #     else: 
-            #         if self.weather_value and self.weather_value in rel:
-            #             row_ctx.add_class("meteo-current")
-        
-            #     #      row_ctx.add_class("meteo-current")
-            #     # if highlight_key and highlight_key in rel:
-            #     #     row_ctx.add_class("meteo-current")
-            #     # else if self.weather_value and self.weather_value in rel:
-            #     #      row_ctx.add_class("meteo-current")
+        #     highlight_key = active_meteo or (self.weather_value and self.weather_value in rel)
+        #     # print(f"active_meteo: {active_meteo}")
+        #     # print(f"highlight_key: {highlight_key}")
+        #     # print(f"weather_value: {self.weather_value}")
+        #     # print(f"rel: {rel}")
+        #     # print("-------------------------------------------")
+        #     if(active_meteo is not None and active_meteo in rel):
+        #         row_ctx.add_class("meteo-current")
+        #     else: 
+        #         if self.weather_value and self.weather_value in rel:
+        #             row_ctx.add_class("meteo-current")
+    
+        #     #      row_ctx.add_class("meteo-current")
+        #     # if highlight_key and highlight_key in rel:
+        #     #     row_ctx.add_class("meteo-current")
+        #     # else if self.weather_value and self.weather_value in rel:
+        #     #      row_ctx.add_class("meteo-current")
 
 
         # Re-apply filter after refresh
@@ -4708,4 +4701,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

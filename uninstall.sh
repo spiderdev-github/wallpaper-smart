@@ -46,20 +46,17 @@ err()  { printf "[1;31m[ERR ][0m %s
 trap 'err "Error line $LINENO: $BASH_COMMAND"' ERR
 
 CONFIG_DIR="$HOME/.config/wallpaper-smart"
-CONFIG_FILE="$CONFIG_DIR/config.json"
 
 BIN_DIR="$HOME/.local/bin"
 APP_DIR="$HOME/.local/share/applications"
 ICON_DIR="$HOME/.local/share/icons/hicolor"
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
-CRON_MARKER_FILE="$CONFIG_DIR/.cron-installed"
 
 SERVICE="wallpaper-smart.service"
 TIMER="wallpaper-smart.timer"
 STYLE_HOOK="wallpaper-smart-style-hook.service"
 STYLE_HOOK_PATH="wallpaper-smart-style-hook.path"
 DESKTOP_FILE="$APP_DIR/wallpaper-smart.desktop"
-APP_ICON="$APP_DIR/wallpaper-smart.png"
 
 # Expand ~ if needed
 WALLPAPERS_DIR="${WALLPAPERS_DIR/#\~/$HOME}"
@@ -107,7 +104,7 @@ rm -rf "$SYSTEMD_USER_DIR/${TIMER}.d" || true
 rm -rf "$SYSTEMD_USER_DIR/${STYLE_HOOK}.d" || true
 # desktop entry + icon
 rm -f "$DESKTOP_FILE" || true
-rm -f "$APP_ICON" || true
+rm -f "$HOME/.local/share/icons/wallpaper-smart-tray.svg" || true
 
 # hicolor icon (if installer placed it)
 rm -f "$ICON_DIR/256x256/apps/wallpaper-smart.png" || true

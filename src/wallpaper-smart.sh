@@ -12,6 +12,7 @@ LAT_FALLBACK="48.5839"   # Strasbourg
 LON_FALLBACK="7.7455"
 
 log() { echo "[$(date '+%F %T')] $*"; }
+warn() { echo "[$(date '+%F %T')] WARN: $*"; }
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -211,11 +212,96 @@ case "$GEO_MODE" in
 esac
 
 # -----------------------------
-# Météo Open-Meteo
+# Météo Open-Meteo (avec cache)
 # -----------------------------
 CODE="0"
+CACHE_VALID="no"
+CACHE_MAX_AGE=600  # 10 minutes
+
+# Fonction pour vérifier et utiliser le cache météo
+check_weather_cache() {
+  if [[ ! -f "$CONFIG_FILE" ]]; then
+    return 1
+  fi
+
+  local cache_code cache_lat cache_lon cache_ts current_ts age
+  
+  cache_code="$(jq -r '.weather_cache.code // empty' "$CONFIG_FILE" 2>/dev/null || true)"
+  cache_lat="$(jq -r '.weather_cache.lat // empty' "$CONFIG_FILE" 2>/dev/null || true)"
+  cache_lon="$(jq -r '.weather_cache.lon // empty' "$CONFIG_FILE" 2>/dev/null || true)"
+  cache_ts="$(jq -r '.weather_cache.timestamp // 0' "$CONFIG_FILE" 2>/dev/null || echo 0)"
+  
+  # Vérifier que le cache existe
+  if [[ -z "$cache_code" || "$cache_code" == "null" ]]; then
+    return 1
+  fi
+  
+  # Vérifier que les coordonnées correspondent (avec une tolérance de 0.01)
+  if [[ -n "$cache_lat" && "$cache_lat" != "null" && -n "$cache_lon" && "$cache_lon" != "null" ]]; then
+    local lat_diff lon_diff
+    lat_diff=$(awk -v a="$LAT" -v b="$cache_lat" 'BEGIN {d=a-b; if(d<0)d=-d; print d}')
+    lon_diff=$(awk -v a="$LON" -v b="$cache_lon" 'BEGIN {d=a-b; if(d<0)d=-d; print d}')
+    
+    # Si la différence est supérieure à 0.01, le cache n'est pas valide
+    if awk -v d="$lat_diff" 'BEGIN {exit !(d > 0.01)}' || awk -v d="$lon_diff" 'BEGIN {exit !(d > 0.01)}'; then
+      return 1
+    fi
+  else
+    return 1
+  fi
+  
+  # Vérifier l'âge du cache
+  current_ts=$(date +%s)
+  age=$((current_ts - cache_ts))
+  
+  if (( age >= CACHE_MAX_AGE )); then
+    return 1
+  fi
+  
+  # Le cache est valide
+  CODE="$cache_code"
+  return 0
+}
+
+# Fonction pour mettre à jour le cache météo
+update_weather_cache() {
+  local code="$1"
+  if [[ ! -f "$CONFIG_FILE" ]]; then
+    return
+  fi
+  
+  local ts=$(date +%s)
+  local tmp_file="${CONFIG_FILE}.tmp"
+  
+  # Mettre à jour le cache dans config.json
+  jq --arg code "$code" \
+     --arg lat "$LAT" \
+     --arg lon "$LON" \
+     --arg ts "$ts" \
+     '.weather_cache = {code: ($code | tonumber), temp: null, timestamp: ($ts | tonumber), lat: ($lat | tonumber), lon: ($lon | tonumber)}' \
+     "$CONFIG_FILE" > "$tmp_file" 2>/dev/null
+  
+  if [[ -f "$tmp_file" ]]; then
+    mv -f "$tmp_file" "$CONFIG_FILE"
+    log "Cache météo mis à jour: code=$code"
+  fi
+}
+
+# # Essayer d'utiliser le cache
+# if check_weather_cache; then
+#   CACHE_VALID="yes"
+#   log "Utilisation du cache météo: code=$CODE"
+# else
+ 
+# fi
+
+# Cache invalide, faire un appel API
+log "Cache météo invalide, appel API"
 METEO_RAW="$(curl -fsSL "https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=weather_code" 2>/dev/null || true)"
 CODE="$(echo "$METEO_RAW" | jq -r '.current.weather_code // 0' 2>/dev/null || echo 0)"
+
+# Mettre à jour le cache
+update_weather_cache "$CODE"
 
 WEATHER_BUCKET="clear"
 case "$CODE" in
